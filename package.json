@@ -1,0 +1,55 @@
+{
+  "name": "navidrome-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "tauri": "tauri",
+    "typecheck": "tsc -b --pretty false",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "rust:fmt:check": "cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check",
+    "rust:clippy": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings",
+    "rust:test": "cargo test --manifest-path src-tauri/Cargo.toml --all-features",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run rust:fmt:check && npm run rust:clippy && npm run rust:test"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "latest",
+    "@tauri-apps/api": "latest",
+    "@tauri-apps/plugin-store": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-router-dom": "latest",
+    "zod": "latest",
+    "zustand": "latest"
+  },
+  "devDependencies": {
+    "@eslint/js": "latest",
+    "@tauri-apps/cli": "latest",
+    "@testing-library/jest-dom": "latest",
+    "@testing-library/react": "latest",
+    "@testing-library/user-event": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-react": "latest",
+    "eslint": "latest",
+    "eslint-plugin-react-hooks": "latest",
+    "eslint-plugin-react-refresh": "latest",
+    "globals": "latest",
+    "jsdom": "latest",
+    "prettier": "latest",
+    "typescript": "latest",
+    "typescript-eslint": "latest",
+    "vite": "latest",
+    "vitest": "latest"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

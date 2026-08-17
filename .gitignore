@@ -1,0 +1,45 @@
+# Dependencies and frontend output
+node_modules/
+dist/
+artifacts/
+coverage/
+
+# Rust and Tauri output
+target/
+src-tauri/target/
+src-tauri/gen/
+*.pdb
+*.msi
+*.msix
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+secrets/
+
+# Runtime data, databases, and logs
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.log
+logs/
+.navidrome-desktop/
+rustup-init.exe
+
+# Editor and OS state
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Test artifacts
+test-results/
+.vitest/
