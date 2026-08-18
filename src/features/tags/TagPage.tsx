@@ -1,5 +1,6 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
 
 import { EmptyState, ErrorState, PageHeader } from '../../components/AsyncState';
 import { TrackTable } from '../../components/TrackTable';
@@ -32,6 +33,20 @@ export function TagPage({ session }: { session: Session }) {
   });
   const tracks = query.data?.pages.flatMap((page) => page.tracks) ?? [];
   const total = query.data?.pages[0]?.total ?? 0;
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = query;
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = loadMoreRef.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(
+      () => {
+        if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+      },
+      { rootMargin: '480px' },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   return (
     <main className="page-content">
@@ -69,15 +84,8 @@ export function TagPage({ session }: { session: Session }) {
             onAddToQueue={(track) => playback.append([track])}
           />
           {query.hasNextPage && (
-            <div className="load-more">
-              <button
-                className="secondary-button"
-                type="button"
-                disabled={query.isFetchingNextPage}
-                onClick={() => void query.fetchNextPage()}
-              >
-                {query.isFetchingNextPage ? 'Loading…' : 'Load more'}
-              </button>
+            <div ref={loadMoreRef} className="infinite-scroll-status" aria-live="polite">
+              {query.isFetchingNextPage ? 'Loading…' : 'Scroll for more'}
             </div>
           )}
         </>

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { AlbumGrid } from '../../components/AlbumGrid';
 import { EmptyState, ErrorState, PageHeader } from '../../components/AsyncState';
@@ -11,7 +11,8 @@ import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { usePlaybackStore } from '../player/playbackStore';
 
 export function SearchPage({ session }: { session: Session }) {
-  const [value, setValue] = useState('');
+  const [params, setParams] = useSearchParams();
+  const [value, setValue] = useState(params.get('q') ?? '');
   const query = useDebouncedValue(value.trim(), 250);
   const playback = usePlaybackStore();
   const results = useQuery({
@@ -38,7 +39,11 @@ export function SearchPage({ session }: { session: Session }) {
           type="search"
           value={value}
           placeholder="Search artists, albums, and tracks"
-          onChange={(event) => setValue(event.target.value)}
+          onChange={(event) => {
+            const next = event.target.value;
+            setValue(next);
+            setParams(next.trim() ? { q: next } : {}, { replace: true });
+          }}
         />
       </label>
       {!query ? (

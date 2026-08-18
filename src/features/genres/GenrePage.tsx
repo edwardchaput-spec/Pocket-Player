@@ -1,4 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 
 import { EmptyState, ErrorState, PageHeader } from '../../components/AsyncState';
@@ -20,6 +21,20 @@ export function GenrePage({ session }: { session: Session }) {
       last.length === PAGE_SIZE ? pages.length * PAGE_SIZE : undefined,
   });
   const tracks = query.data?.pages.flat() ?? [];
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = query;
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = loadMoreRef.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(
+      () => {
+        if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+      },
+      { rootMargin: '480px' },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
   return (
     <main className="page-content">
       <PageHeader>
@@ -55,14 +70,8 @@ export function GenrePage({ session }: { session: Session }) {
             onAddToQueue={(track) => playback.append([track])}
           />
           {query.hasNextPage && (
-            <div className="load-more">
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() => void query.fetchNextPage()}
-              >
-                Load more
-              </button>
+            <div ref={loadMoreRef} className="infinite-scroll-status" aria-live="polite">
+              {query.isFetchingNextPage ? 'Loading…' : 'Scroll for more'}
             </div>
           )}
         </>

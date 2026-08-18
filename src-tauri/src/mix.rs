@@ -26,6 +26,10 @@ pub struct MixInput {
     #[serde(default = "default_adventure")]
     pub adventure: f64,
     #[serde(default)]
+    pub excluded_genres: Vec<String>,
+    #[serde(default)]
+    pub excluded_tags: Vec<String>,
+    #[serde(default)]
     pub random_seed: Option<String>,
 }
 
@@ -203,6 +207,27 @@ fn recipe_filter(
     seed_genre: Option<&str>,
     seed_artist: Option<&str>,
 ) -> bool {
+    let excluded_genre = input.excluded_genres.iter().any(|excluded| {
+        song.genre
+            .as_deref()
+            .is_some_and(|genre| genre.eq_ignore_ascii_case(excluded))
+            || song
+                .genres
+                .iter()
+                .any(|genre| genre.name.eq_ignore_ascii_case(excluded))
+    });
+    let excluded_tag = input.excluded_tags.iter().any(|excluded| {
+        song.moods
+            .iter()
+            .any(|tag| tag.eq_ignore_ascii_case(excluded))
+            || song
+                .comment
+                .as_deref()
+                .is_some_and(|comment| comment.eq_ignore_ascii_case(excluded))
+    });
+    if excluded_genre || excluded_tag {
+        return false;
+    }
     match input.recipe.as_str() {
         "artistRadio" => {
             seed_artist.is_none_or(|id| song.artist_id.as_deref() == Some(id))
@@ -402,6 +427,8 @@ mod tests {
             year: None,
             length: 10,
             adventure: 0.5,
+            excluded_genres: Vec::new(),
+            excluded_tags: Vec::new(),
             random_seed: Some("fixed".to_owned()),
         };
         let first = generate_mix(songs(), &HashMap::new(), input.clone()).expect("mix");

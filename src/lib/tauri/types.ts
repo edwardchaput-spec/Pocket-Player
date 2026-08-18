@@ -319,6 +319,8 @@ export interface MixInput {
   year?: number | undefined;
   length: number;
   adventure: number;
+  excludedGenres?: string[] | undefined;
+  excludedTags?: string[] | undefined;
   randomSeed?: string | undefined;
 }
 

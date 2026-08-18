@@ -4,6 +4,7 @@ import {
   currentDesktopWindow,
   listenPlaybackState,
   sendDesktopControl,
+  showMainWindow,
   SharedPlaybackState,
 } from '../../lib/tauri/desktop';
 
@@ -78,7 +79,7 @@ export function MiniPlayerWindow() {
             <button
               type="button"
               onClick={() => {
-                void sendDesktopControl({ action: 'show-main' });
+                void showMainWindow();
               }}
             >
               Expand

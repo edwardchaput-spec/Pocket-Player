@@ -1,5 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
 
 import { EmptyState, ErrorState, PageHeader } from '../../components/AsyncState';
 import { TrackTable } from '../../components/TrackTable';
@@ -38,14 +38,13 @@ export function TracksPage({ session }: { session: Session }) {
   const [genre, setGenre] = useState('');
   const [sortBy, setSortBy] = useState<TrackSortField>('title');
   const [descending, setDescending] = useState(false);
-  const [page, setPage] = useState(0);
   const playback = usePlaybackStore();
 
   const genres = useQuery({
     queryKey: ['profile', session.profile.profileId, 'genres'],
     queryFn: getGenres,
   });
-  const tracks = useQuery({
+  const tracks = useInfiniteQuery({
     queryKey: [
       'profile',
       session.profile.profileId,
@@ -54,17 +53,21 @@ export function TracksPage({ session }: { session: Session }) {
       genre,
       sortBy,
       descending,
-      page,
     ],
-    queryFn: () =>
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) =>
       queryTracks({
         query: deferredQuery,
         genre: genre || undefined,
         sortBy,
         descending,
-        offset: page * PAGE_SIZE,
+        offset: pageParam,
         size: PAGE_SIZE,
       }),
+    getNextPageParam: (last, pages) => {
+      const loaded = pages.reduce((total, page) => total + page.tracks.length, 0);
+      return loaded < last.total ? loaded : undefined;
+    },
     retry: (count, error: AppError) => error.retryable && count < 2,
   });
   const refresh = useMutation({
@@ -72,7 +75,22 @@ export function TracksPage({ session }: { session: Session }) {
     onSuccess: () =>
       void client.invalidateQueries({ queryKey: ['profile', session.profile.profileId] }),
   });
-  const totalPages = Math.max(1, Math.ceil((tracks.data?.total ?? 0) / PAGE_SIZE));
+  const loadedTracks = tracks.data?.pages.flatMap((page) => page.tracks) ?? [];
+  const total = tracks.data?.pages[0]?.total ?? 0;
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = tracks;
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = loadMoreRef.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(
+      () => {
+        if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+      },
+      { rootMargin: '480px' },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
   return (
     <main className="page-content library-page">
@@ -83,8 +101,8 @@ export function TracksPage({ session }: { session: Session }) {
         </div>
         <div className="index-summary">
           <span>
-            {tracks.data
-              ? `${tracks.data.total.toLocaleString()} matches · indexed ${new Date(tracks.data.refreshedAt).toLocaleString()}`
+            {tracks.data?.pages[0]
+              ? `${total.toLocaleString()} matches · indexed ${new Date(tracks.data.pages[0].refreshedAt).toLocaleString()}`
               : 'Building the searchable library index…'}
           </span>
           <button
@@ -106,7 +124,6 @@ export function TracksPage({ session }: { session: Session }) {
             placeholder="Title, artist, album, genre, mood, format…"
             onChange={(event) => {
               setQuery(event.target.value);
-              setPage(0);
             }}
           />
         </label>
@@ -116,7 +133,6 @@ export function TracksPage({ session }: { session: Session }) {
             value={genre}
             onChange={(event) => {
               setGenre(event.target.value);
-              setPage(0);
             }}
           >
             <option value="">All genres</option>
@@ -133,7 +149,6 @@ export function TracksPage({ session }: { session: Session }) {
             value={sortBy}
             onChange={(event) => {
               setSortBy(event.target.value as TrackSortField);
-              setPage(0);
             }}
           >
             {SORT_OPTIONS.map(([value, label]) => (
@@ -149,7 +164,6 @@ export function TracksPage({ session }: { session: Session }) {
           aria-label={descending ? 'Sort descending' : 'Sort ascending'}
           onClick={() => {
             setDescending((value) => !value);
-            setPage(0);
           }}
         >
           {descending ? 'Descending ↓' : 'Ascending ↑'}
@@ -161,38 +175,24 @@ export function TracksPage({ session }: { session: Session }) {
         </div>
       ) : tracks.isError ? (
         <ErrorState message={tracks.error.message} retry={() => void tracks.refetch()} />
-      ) : tracks.data.tracks.length === 0 ? (
+      ) : loadedTracks.length === 0 ? (
         <EmptyState title="No matching tracks" detail="Try changing the search or genre filter." />
       ) : (
         <>
           <TrackTable
             detailed
-            tracks={tracks.data.tracks}
-            onPlay={(index) => playback.replaceAndPlay(tracks.data.tracks, index)}
+            tracks={loadedTracks}
+            onPlay={(index) => playback.replaceAndPlay(loadedTracks, index)}
             onPlayNext={(track) => playback.playNext([track])}
             onAddToQueue={(track) => playback.append([track])}
           />
-          <nav className="pagination" aria-label="Track pages">
-            <button
-              className="secondary-button"
-              type="button"
-              disabled={page === 0}
-              onClick={() => setPage((value) => Math.max(0, value - 1))}
-            >
-              Previous
-            </button>
-            <span>
-              Page {page + 1} of {totalPages}
-            </span>
-            <button
-              className="secondary-button"
-              type="button"
-              disabled={page + 1 >= totalPages}
-              onClick={() => setPage((value) => value + 1)}
-            >
-              Next
-            </button>
-          </nav>
+          {tracks.hasNextPage && (
+            <div ref={loadMoreRef} className="infinite-scroll-status" aria-live="polite">
+              {tracks.isFetchingNextPage
+                ? 'Loading…'
+                : `Scroll for more (${loadedTracks.length.toLocaleString()} of ${total.toLocaleString()})`}
+            </div>
+          )}
         </>
       )}
     </main>

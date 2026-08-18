@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { AlbumGrid } from '../../components/AlbumGrid';
 import { EmptyState, ErrorState, LoadingCards, PageHeader } from '../../components/AsyncState';
@@ -29,6 +29,20 @@ export function AlbumsPage({ session }: { session: Session }) {
     retry: (count, error: AppError) => error.retryable && count < 2,
   });
   const albums = query.data?.pages.flat() ?? [];
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = query;
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = loadMoreRef.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(
+      () => {
+        if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+      },
+      { rootMargin: '480px' },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
   return (
     <main className="page-content">
       <PageHeader>
@@ -57,15 +71,8 @@ export function AlbumsPage({ session }: { session: Session }) {
         <>
           <AlbumGrid albums={albums} proxyBaseUrl={session.proxyBaseUrl} />
           {query.hasNextPage && (
-            <div className="load-more">
-              <button
-                className="secondary-button"
-                type="button"
-                disabled={query.isFetchingNextPage}
-                onClick={() => void query.fetchNextPage()}
-              >
-                {query.isFetchingNextPage ? 'Loading…' : 'Load more'}
-              </button>
+            <div ref={loadMoreRef} className="infinite-scroll-status" aria-live="polite">
+              {query.isFetchingNextPage ? 'Loading…' : 'Scroll for more'}
             </div>
           )}
         </>

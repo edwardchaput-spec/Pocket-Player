@@ -492,6 +492,9 @@ function PlayerBar({
         <button type="button" aria-label="Open mini player" onClick={() => void openMiniPlayer()}>
           Mini
         </button>
+        <Link className="visualizer-link" to="/now-playing#visualizer" aria-label="Open visualiser">
+          Visualiser
+        </Link>
         <Link
           className="queue-link"
           to="/queue"

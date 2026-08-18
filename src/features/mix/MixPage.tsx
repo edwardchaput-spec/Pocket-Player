@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 
 import { EmptyState, PageHeader } from '../../components/AsyncState';
 import { TrackTable } from '../../components/TrackTable';
-import { generateMix, getGenres } from '../../lib/tauri/library';
+import { generateMix, getGenres, getTags } from '../../lib/tauri/library';
 import { MixInput, MixRecipe, Session } from '../../lib/tauri/types';
 import { usePlaybackStore } from '../player/playbackStore';
 
@@ -29,10 +29,16 @@ export function MixPage({ session }: { session: Session }) {
   const [year, setYear] = useState(Number(params.get('year')) || new Date().getFullYear());
   const [length, setLength] = useState(50);
   const [adventure, setAdventure] = useState(0.5);
+  const [excludedGenres, setExcludedGenres] = useState<string[]>([]);
+  const [excludedTags, setExcludedTags] = useState<string[]>([]);
   const playback = usePlaybackStore();
   const genres = useQuery({
     queryKey: ['profile', session.profile.profileId, 'genres'],
     queryFn: getGenres,
+  });
+  const tags = useQuery({
+    queryKey: ['profile', session.profile.profileId, 'tags'],
+    queryFn: getTags,
   });
   const mix = useMutation({ mutationFn: (input: MixInput) => generateMix(input) });
   const submit = (event: FormEvent) => {
@@ -45,6 +51,8 @@ export function MixPage({ session }: { session: Session }) {
       year,
       length,
       adventure,
+      excludedGenres,
+      excludedTags,
     });
   };
   const tracks = mix.data?.items.map((item) => item.track) ?? [];
@@ -94,6 +102,40 @@ export function MixPage({ session }: { session: Session }) {
             />
           </label>
         )}
+        <label>
+          <span>Exclude genres</span>
+          <select
+            multiple
+            value={excludedGenres}
+            onChange={(event) =>
+              setExcludedGenres([...event.target.selectedOptions].map((option) => option.value))
+            }
+          >
+            {(genres.data ?? []).map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.value}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>Exclude tags</span>
+          <select
+            multiple
+            value={excludedTags}
+            onChange={(event) =>
+              setExcludedTags([...event.target.selectedOptions].map((option) => option.value))
+            }
+          >
+            {(tags.data ?? [])
+              .filter((item) => !item.categories.includes('Genre'))
+              .map((item) => (
+                <option key={item.name} value={item.name}>
+                  {item.name}
+                </option>
+              ))}
+          </select>
+        </label>
         <label>
           <span>Tracks: {length}</span>
           <input

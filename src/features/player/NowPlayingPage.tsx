@@ -71,7 +71,9 @@ export function NowPlayingPage({ session }: { session: Session }) {
         </div>
       </PageHeader>
       <div className="now-playing-layout">
-        <VisualizerStage session={session} track={track} />
+        <div id="visualizer">
+          <VisualizerStage session={session} track={track} />
+        </div>
         <section className="lyrics-panel">
           <header>
             <h2>Lyrics</h2>

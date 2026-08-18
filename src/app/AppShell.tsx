@@ -1,4 +1,5 @@
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { FormEvent, useState } from 'react';
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
 import { Session } from '../lib/tauri/types';
 import { AlbumPage } from '../features/albums/AlbumPage';
@@ -22,6 +23,13 @@ import { TagPage } from '../features/tags/TagPage';
 import { TagsPage } from '../features/tags/TagsPage';
 
 export function AppShell({ session, onLogout }: { session: Session; onLogout: () => void }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [search, setSearch] = useState(new URLSearchParams(location.search).get('q') ?? '');
+  const submitSearch = (event: FormEvent) => {
+    event.preventDefault();
+    void navigate(`/search${search.trim() ? `?q=${encodeURIComponent(search.trim())}` : ''}`);
+  };
   let host = session.profile.serverUrl;
   try {
     host = new URL(session.profile.serverUrl).host;
@@ -36,9 +44,20 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
             <span aria-hidden="true">♪</span>
             <strong>Navidrome Desktop</strong>
           </div>
+          <form className="global-search" role="search" onSubmit={submitSearch}>
+            <label htmlFor="global-search-input" className="sr-only">
+              Search your library
+            </label>
+            <input
+              id="global-search-input"
+              type="search"
+              value={search}
+              placeholder="Search your library…"
+              onChange={(event) => setSearch(event.target.value)}
+            />
+          </form>
           <nav aria-label="Main navigation">
             <NavLink to="/home">Home</NavLink>
-            <NavLink to="/search">Search</NavLink>
             <NavLink to="/albums">Albums</NavLink>
             <NavLink to="/artists">Artists</NavLink>
             <NavLink to="/tracks">Tracks</NavLink>

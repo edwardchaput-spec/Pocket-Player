@@ -1,4 +1,4 @@
-import { emit, listen, UnlistenFn } from '@tauri-apps/api/event';
+import { emit, emitTo, listen, UnlistenFn } from '@tauri-apps/api/event';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
@@ -67,7 +67,14 @@ export async function openMiniPlayer(): Promise<void> {
   });
 }
 
-export const sendDesktopControl = (control: DesktopControl) => emit('desktop-control', control);
+export const sendDesktopControl = (control: DesktopControl) =>
+  emitTo('main', 'desktop-control', control);
+
+export async function showMainWindow(): Promise<void> {
+  const main = await WebviewWindow.getByLabel('main');
+  await main?.show();
+  await main?.setFocus();
+}
 
 export const listenDesktopControl = (
   handler: (control: DesktopControl) => void,
