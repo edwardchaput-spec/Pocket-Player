@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import {
   currentDesktopWindow,
+  isMainWindowVisible,
   listenPlaybackState,
   sendDesktopControl,
   showMainWindow,
@@ -23,6 +24,7 @@ const EMPTY: SharedPlaybackState = {
 export function MiniPlayerWindow() {
   const [state, setState] = useState(EMPTY);
   const [alwaysOnTop, setAlwaysOnTop] = useState(true);
+  const [mainWindowVisible, setMainWindowVisible] = useState(true);
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     void listenPlaybackState(setState).then((dispose) => {
@@ -30,6 +32,22 @@ export function MiniPlayerWindow() {
       return sendDesktopControl({ action: 'mini-ready' });
     });
     return () => unlisten?.();
+  }, []);
+  useEffect(() => {
+    let active = true;
+    const update = () => {
+      void isMainWindowVisible()
+        .then((visible) => {
+          if (active) setMainWindowVisible(visible);
+        })
+        .catch(() => undefined);
+    };
+    update();
+    const timer = window.setInterval(update, 750);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
   }, []);
   const track = state.track;
   return (
@@ -67,6 +85,7 @@ export function MiniPlayerWindow() {
             <button
               type="button"
               aria-label={alwaysOnTop ? 'Disable always on top' : 'Enable always on top'}
+              aria-pressed={alwaysOnTop}
               className={alwaysOnTop ? 'is-active' : ''}
               onClick={() => {
                 const next = !alwaysOnTop;
@@ -74,15 +93,17 @@ export function MiniPlayerWindow() {
                 void currentDesktopWindow().setAlwaysOnTop(next);
               }}
             >
-              Pin
+              {alwaysOnTop ? 'Pinned' : 'Pin'}
             </button>
             <button
               type="button"
+              disabled={mainWindowVisible}
+              title={mainWindowVisible ? 'The main window is already open' : 'Show the main window'}
               onClick={() => {
-                void showMainWindow();
+                void showMainWindow().then(() => setMainWindowVisible(true));
               }}
             >
-              Expand
+              Extend
             </button>
           </div>
         </div>

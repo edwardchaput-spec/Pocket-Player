@@ -1,8 +1,9 @@
-# Navidrome Desktop - Product Specification
+# Pocket Player - Product Specification
 
 ## Document status
 
-- Working title: **Navidrome Desktop**
+- Product name: **Pocket Player**
+- Tagline: **A Navidrome Revolution**
 - Product type: Windows-first desktop music client
 - Primary server: the user's existing Navidrome instance
 - Development location: a normal local folder on the Windows desktop, opened directly in Cursor
@@ -10,11 +11,11 @@
 - API target: Navidrome's supported Subsonic/OpenSubsonic-compatible REST API
 - Initial release scope: one Windows user, one configured Navidrome profile, online streaming
 
-The working title is deliberately generic. The application name, icon, package identifier, and visual brand can be changed after the core product is stable.
+Pocket Player and “A Navidrome Revolution” are the product’s public name and tagline. The existing package identifier remains stable so upgrades retain local settings and Windows credentials.
 
 ## 1. Product summary
 
-Navidrome Desktop is a native-feeling Windows music application that connects to an existing Navidrome server and presents the user's personal music library without occupying a browser window.
+Pocket Player is a native-feeling Windows music application that connects to an existing Navidrome server and presents the user's personal music library without occupying a browser window.
 
 It should combine:
 
@@ -91,7 +92,7 @@ The initial product is not intended to:
 
 ## 6. Primary user journey
 
-1. The user installs or starts Navidrome Desktop.
+1. The user installs or starts Pocket Player.
 2. On first launch, the app presents a connection screen.
 3. The user enters:
    - Navidrome server URL.

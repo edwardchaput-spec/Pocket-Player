@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Navidrome Desktop",
+  "productName": "Pocket Player",
   "version": "0.1.0",
   "identifier": "com.burtonsvilla.navidrome-desktop",
   "build": {
@@ -15,7 +15,7 @@
     },
     "windows": [
       {
-        "title": "Navidrome Desktop",
+        "title": "Pocket Player — A Navidrome Revolution",
         "width": 1220,
         "height": 780,
         "minWidth": 780,

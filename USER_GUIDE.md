@@ -1,4 +1,4 @@
-# Navidrome Desktop user guide
+# Pocket Player user guide
 
 ## Starting Pocket Player
 

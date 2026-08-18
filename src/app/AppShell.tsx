@@ -42,7 +42,10 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
         <aside className="sidebar">
           <div className="app-brand">
             <span aria-hidden="true">♪</span>
-            <strong>Navidrome Desktop</strong>
+            <div>
+              <strong>Pocket Player</strong>
+              <small>A Navidrome Revolution</small>
+            </div>
           </div>
           <form className="global-search" role="search" onSubmit={submitSearch}>
             <label htmlFor="global-search-input" className="sr-only">

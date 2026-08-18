@@ -1,4 +1,4 @@
-# Navidrome Desktop project instructions
+# Pocket Player project instructions
 
 - This is a local Windows Tauri application, not a server deployment. Do not add Docker, VM, LXC, or remote-build workflows.
 - Read `PRODUCT_SPEC.md` and `ARCHITECTURE.md` before architectural changes.

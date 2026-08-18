@@ -1,4 +1,5 @@
 import { useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AlbumGrid } from '../../components/AlbumGrid';
 import { EmptyState, ErrorState, LoadingCards, PageHeader } from '../../components/AsyncState';
@@ -59,6 +60,22 @@ export function HomePage({
       playback.homeSections.includes('pinnedPlaylists') && playback.pinnedPlaylistIds.length > 0,
   });
   const albums = query.data?.pages.flat() ?? [];
+  const { fetchNextPage, hasNextPage, isFetchingNextPage } = query;
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = loadMoreRef.current;
+    if (!element || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && hasNextPage && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
+      },
+      { rootMargin: '480px' },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
   const sectionOrder = (section: (typeof playback.homeSections)[number]) =>
     playback.homeSections.indexOf(section);
 
@@ -90,16 +107,9 @@ export function HomePage({
             ) : (
               <>
                 <AlbumGrid albums={albums} proxyBaseUrl={session.proxyBaseUrl} />
-                {query.hasNextPage && (
-                  <div className="load-more">
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      disabled={query.isFetchingNextPage}
-                      onClick={() => void query.fetchNextPage()}
-                    >
-                      {query.isFetchingNextPage ? 'Loading…' : 'Load more'}
-                    </button>
+                {hasNextPage && (
+                  <div ref={loadMoreRef} className="infinite-scroll-status" aria-live="polite">
+                    {isFetchingNextPage ? 'Loading more albums…' : null}
                   </div>
                 )}
               </>

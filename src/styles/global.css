@@ -134,6 +134,12 @@ body {
   cursor: pointer;
   font-size: 0.7rem;
 }
+.mini-window-actions button.is-active {
+  border: 1px solid color-mix(in srgb, var(--accent), transparent 45%);
+  background: color-mix(in srgb, var(--accent), transparent 78%);
+  color: var(--accent-strong);
+  font-weight: 750;
+}
 .mini-controls .mini-play {
   width: 36px;
   height: 36px;
@@ -426,6 +432,17 @@ button:disabled {
   border-radius: 11px;
   background: var(--accent);
   font-size: 1.2rem;
+}
+.app-brand > div {
+  display: grid;
+  min-width: 0;
+}
+.app-brand small {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 0.62rem;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 .sidebar nav {
   display: grid;

@@ -25,10 +25,12 @@ export function GenrePage({ session }: { session: Session }) {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const element = loadMoreRef.current;
-    if (!element) return;
+    if (!element || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver(
-      () => {
-        if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting) && hasNextPage && !isFetchingNextPage) {
+          void fetchNextPage();
+        }
       },
       { rootMargin: '480px' },
     );

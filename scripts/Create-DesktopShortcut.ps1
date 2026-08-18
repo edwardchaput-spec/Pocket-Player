@@ -13,6 +13,8 @@ if ($ExecutablePath) {
 }
 $candidates += @(
     (Join-Path $repositoryRoot "src-tauri\target\release\navidrome-desktop.exe"),
+    (Join-Path $env:LOCALAPPDATA "Pocket Player\navidrome-desktop.exe"),
+    (Join-Path $env:LOCALAPPDATA "Programs\Pocket Player\navidrome-desktop.exe"),
     (Join-Path $env:LOCALAPPDATA "Navidrome Desktop\navidrome-desktop.exe"),
     (Join-Path $env:LOCALAPPDATA "Programs\Navidrome Desktop\navidrome-desktop.exe")
 )

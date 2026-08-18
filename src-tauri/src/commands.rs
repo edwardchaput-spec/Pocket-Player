@@ -352,7 +352,8 @@ pub async fn export_diagnostics<R: Runtime>(
         "schemaVersion": 1,
         "generatedAt": Utc::now().to_rfc3339(),
         "application": {
-            "name": "Navidrome Desktop",
+            "name": "Pocket Player",
+            "tagline": "A Navidrome Revolution",
             "version": env!("CARGO_PKG_VERSION"),
             "targetOs": std::env::consts::OS,
             "targetArch": std::env::consts::ARCH,

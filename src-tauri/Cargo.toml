@@ -1,8 +1,8 @@
 [package]
 name = "navidrome-desktop"
 version = "0.1.0"
-description = "A secure Windows-first Navidrome desktop client"
-authors = ["Navidrome Desktop contributors"]
+description = "Pocket Player — A Navidrome Revolution"
+authors = ["Pocket Player contributors"]
 edition = "2024"
 
 [lib]

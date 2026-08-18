@@ -1,4 +1,4 @@
-# Navidrome Desktop roadmap status
+# Pocket Player roadmap status
 
 Updated 17 August 2026. This document records what is implemented, what was validated, and which distribution items require release-owner inputs.
 

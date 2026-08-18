@@ -77,8 +77,9 @@ export function LoginScreen({
         <div className="brand-mark" aria-hidden="true">
           ♪
         </div>
-        <p className="eyebrow">Your library, on your desktop</p>
-        <h1 id="login-title">Connect to Navidrome</h1>
+        <p className="eyebrow">Pocket Player</p>
+        <h1 id="login-title">A Navidrome Revolution</h1>
+        <h2>Connect to Navidrome</h2>
         <p className="muted">
           Credentials stay in the Windows app and are never sent to this webview after login.
         </p>

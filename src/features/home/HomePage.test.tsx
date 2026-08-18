@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { AppError } from '../../lib/tauri/types';
 import { albumsFixture, sessionFixture } from '../../test/fixtures';
@@ -33,6 +33,43 @@ describe('HomePage', () => {
     });
     expect(await screen.findByText('Request timed out.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('loads the next album page when the scroll sentinel approaches the viewport', async () => {
+    const page = Array.from({ length: 24 }, (_, index) => ({
+      ...albumsFixture[0]!,
+      id: `album-${index}`,
+      name: `Album ${index}`,
+    }));
+    const loadAlbums = vi.fn((_size: number, offset: number) =>
+      Promise.resolve(offset === 0 ? page : []),
+    );
+    const originalObserver = globalThis.IntersectionObserver;
+    globalThis.IntersectionObserver = class {
+      constructor(callback: IntersectionObserverCallback) {
+        queueMicrotask(() =>
+          callback([{ isIntersecting: true } as IntersectionObserverEntry], this),
+        );
+      }
+      disconnect() {}
+      observe() {}
+      takeRecords() {
+        return [];
+      }
+      unobserve() {}
+      readonly root = null;
+      readonly rootMargin = '0px';
+      readonly scrollMargin = '0px';
+      readonly thresholds = [0];
+    };
+
+    try {
+      renderHome(loadAlbums);
+      await waitFor(() => expect(loadAlbums).toHaveBeenCalledWith(24, 24));
+      expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument();
+    } finally {
+      globalThis.IntersectionObserver = originalObserver;
+    }
   });
 });
 

@@ -1,6 +1,6 @@
-# Navidrome Desktop development
+# Pocket Player development
 
-Navidrome Desktop is built and run directly on Windows. It connects to an existing Navidrome server; no Docker, VM, LXC, remote SSH host, or server-side component is used.
+Pocket Player is built and run directly on Windows. It connects to an existing Navidrome server; no Docker, VM, LXC, remote SSH host, or server-side component is used.
 
 ## Windows prerequisites
 

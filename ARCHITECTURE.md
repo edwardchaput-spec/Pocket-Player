@@ -1,4 +1,4 @@
-# Navidrome Desktop - Technical Architecture
+# Pocket Player - Technical Architecture
 
 ## Document status
 

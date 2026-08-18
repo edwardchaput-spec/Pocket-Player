@@ -52,11 +52,11 @@ export async function openMiniPlayer(): Promise<void> {
   }
   const window = new WebviewWindow('mini-player', {
     url: '/mini-player',
-    title: 'Navidrome Desktop Mini Player',
-    width: 410,
-    height: 180,
-    minWidth: 340,
-    minHeight: 150,
+    title: 'Pocket Player Mini Player',
+    width: 540,
+    height: 190,
+    minWidth: 480,
+    minHeight: 170,
     resizable: true,
     decorations: true,
     alwaysOnTop: true,
@@ -76,10 +76,17 @@ export async function showMainWindow(): Promise<void> {
   await main?.setFocus();
 }
 
+export async function isMainWindowVisible(): Promise<boolean> {
+  const main = await WebviewWindow.getByLabel('main');
+  return main ? main.isVisible() : false;
+}
+
 export const listenDesktopControl = (
   handler: (control: DesktopControl) => void,
 ): Promise<UnlistenFn> =>
-  listen<DesktopControl>('desktop-control', (event) => handler(event.payload));
+  WebviewWindow.getCurrent().listen<DesktopControl>('desktop-control', (event) =>
+    handler(event.payload),
+  );
 
 export const emitPlaybackState = (state: SharedPlaybackState) => emit('playback-state', state);
 

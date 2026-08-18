@@ -103,7 +103,7 @@ pub fn run() {
 }
 
 fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let show = MenuItem::with_id(app, "show", "Show Navidrome Desktop", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", "Show Pocket Player", true, None::<&str>)?;
     let mini = MenuItem::with_id(app, "mini", "Open Mini Player", true, None::<&str>)?;
     let previous = MenuItem::with_id(app, "previous", "Previous", true, None::<&str>)?;
     let play_pause = MenuItem::with_id(app, "play-pause", "Play / Pause", true, None::<&str>)?;
@@ -111,7 +111,7 @@ fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &mini, &previous, &play_pause, &next, &quit])?;
     let mut builder = TrayIconBuilder::new()
-        .tooltip("Navidrome Desktop")
+        .tooltip("Pocket Player — A Navidrome Revolution")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
