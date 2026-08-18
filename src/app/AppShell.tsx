@@ -18,6 +18,8 @@ import { SearchPage } from '../features/search/SearchPage';
 import { SettingsPage } from '../features/settings/SettingsPage';
 import { StatisticsPage } from '../features/statistics/StatisticsPage';
 import { TracksPage } from '../features/tracks/TracksPage';
+import { TagPage } from '../features/tags/TagPage';
+import { TagsPage } from '../features/tags/TagsPage';
 
 export function AppShell({ session, onLogout }: { session: Session; onLogout: () => void }) {
   let host = session.profile.serverUrl;
@@ -41,6 +43,7 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
             <NavLink to="/artists">Artists</NavLink>
             <NavLink to="/tracks">Tracks</NavLink>
             <NavLink to="/genres">Genres</NavLink>
+            <NavLink to="/tags">Tags</NavLink>
             <NavLink to="/playlists">Playlists</NavLink>
             <NavLink to="/queue">Queue</NavLink>
             <NavLink to="/now-playing">Now Playing</NavLink>
@@ -67,6 +70,8 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
             <Route path="/tracks" element={<TracksPage session={session} />} />
             <Route path="/genres" element={<GenresPage session={session} />} />
             <Route path="/genres/:genre" element={<GenrePage session={session} />} />
+            <Route path="/tags" element={<TagsPage session={session} />} />
+            <Route path="/tags/:tag" element={<TagPage session={session} />} />
             <Route path="/playlists" element={<PlaylistsPage session={session} />} />
             <Route path="/playlists/:playlistId" element={<PlaylistPage session={session} />} />
             <Route path="/queue" element={<QueuePage />} />

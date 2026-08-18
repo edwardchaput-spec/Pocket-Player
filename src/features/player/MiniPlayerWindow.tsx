@@ -44,7 +44,23 @@ export function MiniPlayerWindow() {
         <div className="mini-title">
           <div>
             <strong>{track?.title ?? 'Nothing playing'}</strong>
-            <span>{track?.artist ?? 'Choose music in the main window'}</span>
+            {track ? (
+              <span className="mini-metadata-links">
+                <MiniLibraryLink
+                  id={track.artistId}
+                  label={track.displayArtist ?? track.artist ?? 'Unknown artist'}
+                  route="artists"
+                />
+                {' · '}
+                <MiniLibraryLink
+                  id={track.albumId}
+                  label={track.album ?? 'Unknown album'}
+                  route="albums"
+                />
+              </span>
+            ) : (
+              <span>Choose music in the main window</span>
+            )}
           </div>
           <div className="mini-window-actions">
             <button
@@ -113,6 +129,31 @@ export function MiniPlayerWindow() {
         </div>
       </div>
     </main>
+  );
+}
+
+function MiniLibraryLink({
+  id,
+  label,
+  route,
+}: {
+  id?: string | null | undefined;
+  label: string;
+  route: 'artists' | 'albums';
+}) {
+  if (!id) return <>{label}</>;
+  return (
+    <button
+      type="button"
+      onClick={() =>
+        void sendDesktopControl({
+          action: 'navigate-main',
+          route: `/${route}/${encodeURIComponent(id)}`,
+        })
+      }
+    >
+      {label}
+    </button>
   );
 }
 

@@ -1,4 +1,8 @@
-use std::{cmp::Ordering, sync::Arc};
+use std::{
+    cmp::Ordering,
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
+    sync::Arc,
+};
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -28,6 +32,8 @@ pub struct TrackQuery {
     pub query: String,
     #[serde(default)]
     pub genre: Option<String>,
+    #[serde(default)]
+    pub tag: Option<String>,
     #[serde(default = "default_sort")]
     pub sort_by: String,
     #[serde(default)]
@@ -46,6 +52,15 @@ pub struct TrackQueryResult {
     pub refreshed_at: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagSummary {
+    pub name: String,
+    pub song_count: usize,
+    pub album_count: usize,
+    pub categories: Vec<String>,
+}
+
 pub struct LibraryIndex {
     database: Arc<LocalDatabase>,
     data: RwLock<Option<Arc<IndexedLibrary>>>,
@@ -54,6 +69,8 @@ pub struct LibraryIndex {
 
 struct IndexedLibrary {
     tracks: Vec<IndexedSong>,
+    tags: Vec<TagSummary>,
+    tag_tracks: HashMap<String, Vec<usize>>,
     refreshed_at: String,
 }
 
@@ -61,6 +78,13 @@ struct IndexedSong {
     song: Song,
     search_text: String,
     genre_text: String,
+    tags: Vec<IndexedTag>,
+}
+
+struct IndexedTag {
+    key: String,
+    name: String,
+    categories: BTreeSet<String>,
 }
 
 impl LibraryIndex {
@@ -81,10 +105,10 @@ impl LibraryIndex {
         *self.data.write().await = if songs.is_empty() {
             None
         } else {
-            Some(Arc::new(IndexedLibrary {
-                tracks: songs.into_iter().map(IndexedSong::new).collect(),
-                refreshed_at: Utc::now().to_rfc3339(),
-            }))
+            Some(Arc::new(IndexedLibrary::new(
+                songs,
+                Utc::now().to_rfc3339(),
+            )))
         };
         Ok(())
     }
@@ -130,11 +154,7 @@ impl LibraryIndex {
         self.database
             .replace_track_cache(profile_id, &songs)
             .await?;
-        let tracks = songs.into_iter().map(IndexedSong::new).collect();
-        let indexed = Arc::new(IndexedLibrary {
-            tracks,
-            refreshed_at: refreshed_at.clone(),
-        });
+        let indexed = Arc::new(IndexedLibrary::new(songs, refreshed_at.clone()));
         let track_count = indexed.tracks.len();
         *self.data.write().await = Some(indexed);
         Ok(LibraryIndexStatus {
@@ -172,9 +192,26 @@ impl LibraryIndex {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(str::to_lowercase);
-        let mut matches: Vec<&IndexedSong> = index
-            .tracks
-            .iter()
+        let tag = input
+            .tag
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_lowercase);
+        let candidates: Vec<&IndexedSong> = tag.as_ref().map_or_else(
+            || index.tracks.iter().collect(),
+            |value| {
+                index
+                    .tag_tracks
+                    .get(value)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|track_index| index.tracks.get(*track_index))
+                    .collect()
+            },
+        );
+        let mut matches: Vec<&IndexedSong> = candidates
+            .into_iter()
             .filter(|track| {
                 query_terms
                     .iter()
@@ -225,11 +262,94 @@ impl LibraryIndex {
             })
             .unwrap_or_default())
     }
+
+    pub async fn tags(
+        &self,
+        client: &NavidromeClient,
+        profile_id: &str,
+    ) -> AppResult<Vec<TagSummary>> {
+        if self.data.read().await.is_none() {
+            self.refresh(client, profile_id).await?;
+        }
+        Ok(self
+            .data
+            .read()
+            .await
+            .as_ref()
+            .map(|index| index.tags.clone())
+            .unwrap_or_default())
+    }
+}
+
+impl IndexedLibrary {
+    fn new(songs: Vec<Song>, refreshed_at: String) -> Self {
+        let tracks: Vec<IndexedSong> = songs.into_iter().map(IndexedSong::new).collect();
+        let mut accumulators: BTreeMap<String, TagAccumulator> = BTreeMap::new();
+        let mut tag_tracks: HashMap<String, Vec<usize>> = HashMap::new();
+        for (track_index, track) in tracks.iter().enumerate() {
+            let album_key = track
+                .song
+                .album_id
+                .as_deref()
+                .or(track.song.album.as_deref())
+                .map(str::to_lowercase);
+            for tag in &track.tags {
+                tag_tracks
+                    .entry(tag.key.clone())
+                    .or_default()
+                    .push(track_index);
+                let accumulator = accumulators
+                    .entry(tag.key.clone())
+                    .or_insert_with(|| TagAccumulator::new(tag.name.clone()));
+                accumulator.song_count += 1;
+                accumulator
+                    .categories
+                    .extend(tag.categories.iter().cloned());
+                if let Some(album) = &album_key {
+                    accumulator.albums.insert(album.clone());
+                }
+            }
+        }
+        let tags = accumulators
+            .into_values()
+            .map(|tag| TagSummary {
+                name: tag.name,
+                song_count: tag.song_count,
+                album_count: tag.albums.len(),
+                categories: tag.categories.into_iter().collect(),
+            })
+            .collect();
+        Self {
+            tracks,
+            tags,
+            tag_tracks,
+            refreshed_at,
+        }
+    }
+}
+
+struct TagAccumulator {
+    name: String,
+    song_count: usize,
+    albums: HashSet<String>,
+    categories: BTreeSet<String>,
+}
+
+impl TagAccumulator {
+    fn new(name: String) -> Self {
+        Self {
+            name,
+            song_count: 0,
+            albums: HashSet::new(),
+            categories: BTreeSet::new(),
+        }
+    }
 }
 
 impl IndexedSong {
     fn new(song: Song) -> Self {
         let genre_text = song.genre.clone().unwrap_or_default().to_lowercase();
+        let tags = indexed_tags(&song);
         let search_text = [
             Some(song.title.as_str()),
             song.artist.as_deref(),
@@ -252,8 +372,41 @@ impl IndexedSong {
             song,
             search_text,
             genre_text,
+            tags,
         }
     }
+}
+
+fn indexed_tags(song: &Song) -> Vec<IndexedTag> {
+    let mut values: BTreeMap<String, (String, BTreeSet<String>)> = BTreeMap::new();
+    let mut add = |name: &str, category: &str| {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return;
+        }
+        let key = trimmed.to_lowercase();
+        let entry = values
+            .entry(key)
+            .or_insert_with(|| (trimmed.to_owned(), BTreeSet::new()));
+        entry.1.insert(category.to_owned());
+    };
+    if let Some(genre) = &song.genre {
+        add(genre, "Genre");
+    }
+    for genre in &song.genres {
+        add(&genre.name, "Genre");
+    }
+    for mood in &song.moods {
+        add(mood, "Mood");
+    }
+    values
+        .into_iter()
+        .map(|(key, (name, categories))| IndexedTag {
+            key,
+            name,
+            categories,
+        })
+        .collect()
 }
 
 fn default_sort() -> String {
@@ -355,5 +508,51 @@ mod tests {
         assert!(indexed.search_text.contains("rock"));
         assert!(indexed.search_text.contains("energetic"));
         assert!(indexed.search_text.contains("an artist"));
+    }
+
+    #[test]
+    fn builds_a_deduplicated_exact_tag_catalogue() {
+        let first: Song = serde_json::from_value(serde_json::json!({
+            "id": "one",
+            "title": "First",
+            "album": "One album",
+            "albumId": "album-one",
+            "genre": "Rock",
+            "genres": [{ "name": "rock" }, { "name": "Alternative" }],
+            "moods": ["Energetic"]
+        }))
+        .expect("first song");
+        let second: Song = serde_json::from_value(serde_json::json!({
+            "id": "two",
+            "title": "Second",
+            "album": "Two album",
+            "albumId": "album-two",
+            "genres": [{ "name": "Alternative" }],
+            "moods": ["Energetic"]
+        }))
+        .expect("second song");
+        let library = IndexedLibrary::new(vec![first, second], "now".to_owned());
+
+        let rock = library
+            .tags
+            .iter()
+            .find(|tag| tag.name.eq_ignore_ascii_case("rock"))
+            .expect("rock tag");
+        assert_eq!(rock.song_count, 1);
+        assert_eq!(rock.album_count, 1);
+        let energetic = library
+            .tags
+            .iter()
+            .find(|tag| tag.name == "Energetic")
+            .expect("mood tag");
+        assert_eq!(energetic.song_count, 2);
+        assert_eq!(energetic.categories, vec!["Mood"]);
+
+        let indexed = &library.tracks[0];
+        assert_eq!(
+            indexed.tags.iter().filter(|tag| tag.key == "rock").count(),
+            1
+        );
+        assert_eq!(library.tag_tracks.get("rock"), Some(&vec![0]));
     }
 }

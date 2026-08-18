@@ -47,6 +47,9 @@ pub struct TopTrack {
     pub track_id: String,
     pub title: String,
     pub artist: Option<String>,
+    pub artist_id: Option<String>,
+    pub album: Option<String>,
+    pub album_id: Option<String>,
     pub plays: u64,
     pub listened_ms: u64,
 }
@@ -348,7 +351,10 @@ fn statistics_sync(path: &PathBuf, profile_id: &str) -> AppResult<ListeningStati
             title: song
                 .as_ref()
                 .map_or_else(|| "Unknown track".to_owned(), |item| item.title.clone()),
-            artist: song.and_then(|item| item.artist),
+            artist: song.as_ref().and_then(|item| item.artist.clone()),
+            artist_id: song.as_ref().and_then(|item| item.artist_id.clone()),
+            album: song.as_ref().and_then(|item| item.album.clone()),
+            album_id: song.as_ref().and_then(|item| item.album_id.clone()),
             track_id,
             plays: plays.max(0) as u64,
             listened_ms: listened_ms.max(0) as u64,

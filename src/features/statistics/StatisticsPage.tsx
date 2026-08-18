@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { EmptyState, ErrorState, PageHeader } from '../../components/AsyncState';
 import { getListeningStatistics } from '../../lib/tauri/playback';
 import { Session } from '../../lib/tauri/types';
+import { AlbumLink, ArtistLink } from '../../components/LibraryLinks';
 
 export function StatisticsPage({ session }: { session: Session }) {
   const query = useQuery({
@@ -66,7 +67,15 @@ export function StatisticsPage({ session }: { session: Session }) {
                 <li key={track.trackId}>
                   <span>
                     <strong>{track.title}</strong>
-                    <small>{track.artist ?? 'Unknown artist'}</small>
+                    <small className="library-inline-links">
+                      <ArtistLink artistId={track.artistId} name={track.artist} />
+                      {track.album && (
+                        <>
+                          {' · '}
+                          <AlbumLink albumId={track.albumId} name={track.album} />
+                        </>
+                      )}
+                    </small>
                   </span>
                   <span>
                     {track.plays} plays · {formatListening(track.listenedMs)}

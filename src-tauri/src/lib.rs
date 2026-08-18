@@ -73,6 +73,7 @@ pub fn run() {
             commands::library_index_status,
             commands::refresh_library_index,
             commands::query_tracks,
+            commands::tags,
             commands::record_playback_event,
             commands::listening_statistics,
             commands::clear_local_library_data,

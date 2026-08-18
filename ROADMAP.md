@@ -15,6 +15,8 @@ Updated 17 August 2026. This document records what is implemented, what was vali
 - Search plus album, artist, track, genre, favourite, and playlist navigation.
 - Album and playlist mutations for favourites, ratings, create, rename, delete, add, remove, and reorder.
 - A persistent full-library SQLite-backed metadata index. Search covers title, artist, album, genres, moods, file type, comments, MusicBrainz ID, and display tags.
+- An indexed Tags catalogue over exact multi-value genres and moods, with category/track/distinct-album counts and paged track views.
+- Consistent opaque-ID artist and album navigation across search, grids, track tables, playlists, queue, Now Playing, statistics, and player windows.
 - Whole-library sorting for title, artist, album, year, genre, numeric duration, track/disc, play count, rating, favourite state, bitrate, bit depth, sample rate, channels, size, file type, created date, and BPM.
 - Deterministic local queue editing with duplicate occurrences, restart persistence, and periodic Navidrome queue synchronization.
 
@@ -32,8 +34,9 @@ Updated 17 August 2026. This document records what is implemented, what was vali
 
 ### Phase 5 — visual and audio polish
 
-- One shared Web Audio analyser and five visualisers: bars, mirror, waveform, circular spectrum, and ambient artwork.
-- Quality controls, reduced-motion handling, animation cleanup, and full-screen visualisation.
+- One shared Web Audio analyser and 21 trusted visualizers spanning classic spectra, particles, pseudo-3D scenes, WebGL shaders, a MilkDrop-inspired kaleidoscope, and the locally adaptive AI Conductor.
+- A categorized preset browser, favourites, sensitivity, quality, automatic rotation, random mode, smooth transitions, visualizer-only full screen, GPU renderer diagnostics, adaptive frame/resolution/complexity control, reduced-motion handling, off-screen and paused suspension, and allocation-conscious particle/audio tracking.
+- A production Desktop shortcut workflow that launches the release executable without PowerShell or a development server.
 - Plain and synchronized OpenSubsonic lyrics with current-line highlighting and safe unavailable/error states.
 
 ### Phase 6 — distribution and maintenance

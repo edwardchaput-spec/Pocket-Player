@@ -1,7 +1,6 @@
-import { Link } from 'react-router-dom';
-
 import { formatDuration } from '../lib/format';
 import { Song } from '../lib/tauri/types';
+import { AlbumLink, ArtistLink, TrackTagLinks } from './LibraryLinks';
 import { AddToPlaylistButton, FavoriteButton, RatingControl } from './LibraryActions';
 
 interface TrackTableProps {
@@ -53,31 +52,16 @@ export function TrackTable({
                 </small>
               </td>
               <td>
-                {track.artistId ? (
-                  <Link to={`/artists/${encodeURIComponent(track.artistId)}`}>
-                    {track.displayArtist ?? track.artist ?? 'Unknown artist'}
-                  </Link>
-                ) : (
-                  (track.displayArtist ?? track.artist ?? 'Unknown artist')
-                )}
+                <ArtistLink artistId={track.artistId} name={track.displayArtist ?? track.artist} />
               </td>
               <td>
-                {track.albumId ? (
-                  <Link to={`/albums/${encodeURIComponent(track.albumId)}`}>
-                    {track.album ?? 'Unknown album'}
-                  </Link>
-                ) : (
-                  (track.album ?? 'Unknown album')
-                )}
+                <AlbumLink albumId={track.albumId} name={track.album} />
               </td>
               {detailed && (
                 <td>
                   <div className="tag-list">
-                    {track.genre && <span>{track.genre}</span>}
+                    <TrackTagLinks track={track} />
                     {track.year != null && <span>{track.year}</span>}
-                    {(track.moods ?? []).slice(0, 2).map((mood) => (
-                      <span key={mood}>{mood}</span>
-                    ))}
                     {track.bpm != null && <span>{track.bpm} BPM</span>}
                   </div>
                 </td>

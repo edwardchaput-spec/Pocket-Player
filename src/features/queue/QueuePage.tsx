@@ -1,7 +1,6 @@
-import { Link } from 'react-router-dom';
-
 import { EmptyState, PageHeader } from '../../components/AsyncState';
 import { formatDuration } from '../../lib/format';
+import { AlbumLink, ArtistLink } from '../../components/LibraryLinks';
 import { usePlaybackStore } from '../player/playbackStore';
 
 export function QueuePage() {
@@ -46,18 +45,23 @@ export function QueuePage() {
               key={item.occurrenceId}
               className={index === state.currentIndex ? 'is-current' : ''}
             >
-              <button className="queue-main" type="button" onClick={() => state.jumpTo(index)}>
-                <span className="queue-position">
-                  {index === state.currentIndex ? '▶' : index + 1}
-                </span>
-                <span>
+              <div className="queue-copy">
+                <button className="queue-main" type="button" onClick={() => state.jumpTo(index)}>
+                  <span className="queue-position">
+                    {index === state.currentIndex ? '▶' : index + 1}
+                  </span>
                   <strong>{item.track.title}</strong>
-                  <small>
-                    {item.track.artist ?? 'Unknown artist'} · {item.track.album ?? 'Unknown album'}
-                  </small>
-                </span>
-                <span>{formatDuration(item.track.duration)}</span>
-              </button>
+                  <span>{formatDuration(item.track.duration)}</span>
+                </button>
+                <small className="queue-metadata library-inline-links">
+                  <ArtistLink
+                    artistId={item.track.artistId}
+                    name={item.track.displayArtist ?? item.track.artist}
+                  />
+                  {' · '}
+                  <AlbumLink albumId={item.track.albumId} name={item.track.album} />
+                </small>
+              </div>
               <div className="queue-actions">
                 <button
                   type="button"
@@ -75,14 +79,6 @@ export function QueuePage() {
                 >
                   ↓
                 </button>
-                {item.track.albumId && (
-                  <Link
-                    to={`/albums/${encodeURIComponent(item.track.albumId)}`}
-                    aria-label={`Open album ${item.track.album ?? ''}`}
-                  >
-                    Album
-                  </Link>
-                )}
                 <button
                   type="button"
                   aria-label={`Remove ${item.track.title} from queue`}

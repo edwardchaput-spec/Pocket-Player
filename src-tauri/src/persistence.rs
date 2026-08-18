@@ -22,6 +22,16 @@ pub struct PlayerSettings {
     pub visualizer: String,
     #[serde(default = "default_visualizer_quality")]
     pub visualizer_quality: u8,
+    #[serde(default = "default_visualizer_sensitivity")]
+    pub visualizer_sensitivity: f64,
+    #[serde(default)]
+    pub visualizer_auto_rotate: bool,
+    #[serde(default = "default_visualizer_rotation_seconds")]
+    pub visualizer_rotation_seconds: u16,
+    #[serde(default)]
+    pub visualizer_random_mode: bool,
+    #[serde(default)]
+    pub visualizer_favorites: Vec<String>,
     #[serde(default = "default_theme")]
     pub theme: String,
     #[serde(default = "default_density")]
@@ -61,6 +71,11 @@ impl Default for PlayerSettings {
             muted: false,
             visualizer: default_visualizer(),
             visualizer_quality: default_visualizer_quality(),
+            visualizer_sensitivity: default_visualizer_sensitivity(),
+            visualizer_auto_rotate: false,
+            visualizer_rotation_seconds: default_visualizer_rotation_seconds(),
+            visualizer_random_mode: false,
+            visualizer_favorites: Vec::new(),
             theme: default_theme(),
             density: default_density(),
             notifications: default_notifications(),
@@ -98,7 +113,7 @@ pub fn load_player_settings<R: Runtime>(app: &AppHandle<R>) -> PlayerSettings {
         .ok()
         .and_then(|store| store.get(PLAYER_KEY))
         .and_then(|value| serde_json::from_value(value).ok())
-        .filter(|settings: &PlayerSettings| (0.0..=1.0).contains(&settings.volume))
+        .filter(valid_player_settings)
         .unwrap_or_default()
 }
 
@@ -106,22 +121,7 @@ pub fn save_player_settings<R: Runtime>(
     app: &AppHandle<R>,
     settings: &PlayerSettings,
 ) -> AppResult<()> {
-    if !(0.0..=1.0).contains(&settings.volume) {
-        return Err(AppError::invalid_input("Volume must be between 0 and 1."));
-    }
-    if !matches!(
-        settings.visualizer.as_str(),
-        "bars" | "mirror" | "wave" | "circular" | "ambient"
-    ) || !(1..=3).contains(&settings.visualizer_quality)
-        || !matches!(settings.theme.as_str(), "dark" | "light" | "system")
-        || !matches!(settings.density.as_str(), "comfortable" | "compact")
-        || !valid_home_sections(&settings.home_sections)
-        || settings.pinned_playlist_ids.len() > 100
-        || settings
-            .pinned_playlist_ids
-            .iter()
-            .any(|id| id.is_empty() || id.len() > 512)
-    {
+    if !valid_player_settings(settings) {
         return Err(AppError::invalid_input("The player settings are invalid."));
     }
     let store = app.store(STORE_FILE).map_err(|_| AppError::storage())?;
@@ -132,12 +132,70 @@ pub fn save_player_settings<R: Runtime>(
     store.save().map_err(|_| AppError::storage())
 }
 
+fn valid_player_settings(settings: &PlayerSettings) -> bool {
+    let mut favorite_modes = std::collections::HashSet::new();
+    (0.0..=1.0).contains(&settings.volume)
+        && valid_visualizer(&settings.visualizer)
+        && (1..=3).contains(&settings.visualizer_quality)
+        && settings.visualizer_sensitivity.is_finite()
+        && (0.35..=2.5).contains(&settings.visualizer_sensitivity)
+        && (10..=300).contains(&settings.visualizer_rotation_seconds)
+        && settings.visualizer_favorites.len() <= 21
+        && settings
+            .visualizer_favorites
+            .iter()
+            .all(|mode| valid_visualizer(mode) && favorite_modes.insert(mode.as_str()))
+        && matches!(settings.theme.as_str(), "dark" | "light" | "system")
+        && matches!(settings.density.as_str(), "comfortable" | "compact")
+        && valid_home_sections(&settings.home_sections)
+        && settings.pinned_playlist_ids.len() <= 100
+        && settings
+            .pinned_playlist_ids
+            .iter()
+            .all(|id| !id.is_empty() && id.len() <= 512)
+}
+
 fn default_visualizer() -> String {
     "bars".to_owned()
 }
 
 fn default_visualizer_quality() -> u8 {
     2
+}
+
+fn default_visualizer_sensitivity() -> f64 {
+    1.0
+}
+
+fn default_visualizer_rotation_seconds() -> u16 {
+    30
+}
+
+fn valid_visualizer(mode: &str) -> bool {
+    matches!(
+        mode,
+        "bars"
+            | "mirror"
+            | "wave"
+            | "circular"
+            | "ambient"
+            | "starfield"
+            | "sparks"
+            | "dust"
+            | "fountain"
+            | "orbit"
+            | "rain"
+            | "ribbons"
+            | "neonTunnel"
+            | "landscape"
+            | "geometry"
+            | "towers"
+            | "galaxy"
+            | "plasma"
+            | "album3d"
+            | "kaleidoscope"
+            | "ai"
+    )
 }
 
 fn default_theme() -> String {
@@ -257,5 +315,24 @@ mod tests {
             "newest".to_owned()
         ]));
         assert!(!valid_home_sections(&["unknown".to_owned()]));
+    }
+
+    #[test]
+    fn visualizer_modes_include_gpu_particles_and_ai() {
+        assert!(valid_visualizer("sparks"));
+        assert!(valid_visualizer("neonTunnel"));
+        assert!(valid_visualizer("ai"));
+        assert!(!valid_visualizer("downloaded-script"));
+
+        let duplicate_favorites = PlayerSettings {
+            visualizer_favorites: vec!["ai".to_owned(), "ai".to_owned()],
+            ..PlayerSettings::default()
+        };
+        assert!(!valid_player_settings(&duplicate_favorites));
+        let valid_favorites = PlayerSettings {
+            visualizer_favorites: vec!["ai".to_owned(), "plasma".to_owned()],
+            ..PlayerSettings::default()
+        };
+        assert!(valid_player_settings(&valid_favorites));
     }
 }

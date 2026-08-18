@@ -1,5 +1,5 @@
 import { PropsWithChildren, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import {
   recordPlaybackEvent,
@@ -9,6 +9,7 @@ import {
   syncPlayQueue,
 } from '../../lib/tauri/playback';
 import { Session } from '../../lib/tauri/types';
+import { AlbumLink, ArtistLink } from '../../components/LibraryLinks';
 import {
   currentDesktopWindow,
   emitPlaybackState,
@@ -21,6 +22,7 @@ import { ScrobbleController } from './ScrobbleController';
 import { AudioAnalysisProvider } from './AudioAnalysisContext';
 
 export function PlayerProvider({ children, session }: PropsWithChildren<{ session: Session }>) {
+  const navigate = useNavigate();
   const audioRef = useRef<HTMLAudioElement>(null);
   const reporterRef = useRef<ScrobbleController | null>(null);
   const pendingSeekRef = useRef(0);
@@ -107,6 +109,11 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
         muted: state.muted,
         visualizer: state.visualizer,
         visualizerQuality: state.visualizerQuality,
+        visualizerSensitivity: state.visualizerSensitivity,
+        visualizerAutoRotate: state.visualizerAutoRotate,
+        visualizerRotationSeconds: state.visualizerRotationSeconds,
+        visualizerRandomMode: state.visualizerRandomMode,
+        visualizerFavorites: state.visualizerFavorites,
         theme: state.theme,
         density: state.density,
         notifications: state.notifications,
@@ -121,6 +128,11 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
     state.muted,
     state.visualizer,
     state.visualizerQuality,
+    state.visualizerSensitivity,
+    state.visualizerAutoRotate,
+    state.visualizerRotationSeconds,
+    state.visualizerRandomMode,
+    state.visualizerFavorites,
     state.theme,
     state.density,
     state.notifications,
@@ -143,6 +155,14 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
       else if (control.action === 'show-main') {
         void currentDesktopWindow().show();
         void currentDesktopWindow().setFocus();
+      } else if (
+        control.action === 'navigate-main' &&
+        control.route &&
+        /^\/(artists|albums)\/[^/]+$/.test(control.route)
+      ) {
+        void navigate(control.route);
+        void currentDesktopWindow().show();
+        void currentDesktopWindow().setFocus();
       } else if (control.action === 'previous') playback.previous();
       else if (control.action === 'next') playback.next('manual');
       else if ((control.action === 'play-pause' || control.action === 'play') && audio?.paused)
@@ -162,7 +182,7 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
       unlisten = dispose;
     });
     return () => unlisten?.();
-  }, [session.proxyBaseUrl]);
+  }, [navigate, session.proxyBaseUrl]);
 
   useEffect(() => {
     void publishPlaybackState(session.proxyBaseUrl);
@@ -401,7 +421,11 @@ function PlayerBar({
           <Link to="/now-playing">
             <strong>{track.title}</strong>
           </Link>
-          <span>{track.artist ?? 'Unknown artist'}</span>
+          <span className="player-metadata-links">
+            <ArtistLink artistId={track.artistId} name={track.displayArtist ?? track.artist} />
+            {' · '}
+            <AlbumLink albumId={track.albumId} name={track.album} />
+          </span>
         </div>
       </div>
       <div className="player-center">

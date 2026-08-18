@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { Artwork } from '../../components/Artwork';
 import { EmptyState, ErrorState } from '../../components/AsyncState';
 import { FavoriteButton, RatingControl } from '../../components/LibraryActions';
+import { ArtistLink, TagLink } from '../../components/LibraryLinks';
 import { TrackTable } from '../../components/TrackTable';
 import { formatDuration } from '../../lib/format';
 import { getAlbum } from '../../lib/tauri/library';
@@ -44,16 +45,21 @@ export function AlbumPage({ session }: { session: Session }) {
         <div>
           <p className="eyebrow">Album</p>
           <h1>{album.name}</h1>
-          <p className="album-artist">{album.artist ?? 'Unknown artist'}</p>
+          <p className="album-artist">
+            <ArtistLink artistId={album.artistId} name={album.artist} />
+          </p>
           <p className="muted">
-            {[
-              album.year,
-              album.genre,
-              album.songCount ? `${album.songCount} songs` : null,
-              formatDuration(album.duration),
-            ]
-              .filter(Boolean)
-              .join(' · ')}
+            {album.year ?? 'Year unknown'}
+            {album.genre && (
+              <>
+                {' · '}
+                <TagLink name={album.genre} />
+              </>
+            )}
+            {' · '}
+            {album.songCount ? `${album.songCount} songs` : 'Track count unknown'}
+            {' · '}
+            {formatDuration(album.duration)}
           </p>
           <div className="button-row">
             <button

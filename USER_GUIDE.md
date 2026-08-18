@@ -1,5 +1,11 @@
 # Navidrome Desktop user guide
 
+## Starting Pocket Player
+
+- Double-click **Pocket Player** on the Windows Desktop after the shortcut has been installed.
+- The shortcut opens the production application directly; PowerShell and the Vite development server are not required.
+- Developers can recreate it after a build with `npm.cmd run shortcut`. The normal MSI or NSIS installer remains the recommended distribution route.
+
 ## Connect
 
 1. Start the app with `npm.cmd run tauri dev` during development, or launch an installed build.
@@ -9,7 +15,7 @@
 
 ## Browse and play
 
-- Use Home, Search, Albums, Artists, Tracks, Genres, or Playlists from the sidebar.
+- Use Home, Search, Albums, Artists, Tracks, Genres, Tags, or Playlists from the sidebar.
 - Open an album and choose **Play album**, **Shuffle**, or a track’s play action.
 - Use **Play next** and **Add to queue** throughout the library.
 - Open Queue to jump, reorder with keyboard-accessible arrows, remove, clear, shuffle, or change repeat mode.
@@ -26,6 +32,13 @@ Open **Tracks**. The first visit builds the complete metadata index and later la
 - Choose **Refresh index** after a large server scan or metadata retag.
 
 The index contains metadata only. Audio remains on Navidrome and streams on demand.
+
+## Navigate by tags and credits
+
+- Open **Tags** to browse every indexed multi-value genre and mood, with track and album counts. Filtering matches both tag names and their Genre/Mood category.
+- Select a tag to see its exact matches; this is not an approximate text search.
+- Artist names and album names are links throughout search results, album cards, track tables, playlists, the queue, Now Playing, statistics, and both player windows.
+- A missing Navidrome artist or album ID is displayed as plain text rather than linking to a potentially incorrect match.
 
 ## Favourites, ratings, and playlists
 
@@ -44,8 +57,16 @@ The index contains metadata only. Audio remains on Navidrome and streams on dema
 ## Lyrics and visualisers
 
 - Now Playing displays plain or synchronized lyrics when Navidrome exposes the OpenSubsonic lyrics endpoint.
-- Choose bars, mirrored spectrum, waveform, circular spectrum, or ambient artwork. Quality can be reduced in Settings.
-- Full-screen mode affects visuals only; playback continues through the one persistent audio element.
+- Open **Now Playing** and choose **Browse** to explore 21 visualizers grouped into Classic, Particles, 3D & shaders, and Adaptive categories.
+- Particle scenes include Hyperdrive, Beat sparks, Cosmic dust, Chromatic fountain, Album orbit, Neon rain, and Ribbon trails.
+- GPU and pseudo-3D scenes include Neon tunnel, Audio landscape, Pulse geometry, Frequency city, Particle galaxy, Liquid plasma, and Album dimension. Kaleidoscope provides a MilkDrop-inspired radial treatment.
+- **AI Conductor** interprets frequency balance, energy, spectral motion, and beats locally, then blends galaxy, tunnel, and plasma treatments. It does not upload audio or contact an AI service.
+- Star presets with **★**. Automatic rotation uses favourites when any exist; otherwise it rotates through the complete pack. Random mode changes the order.
+- Adjust sensitivity, quality, and rotation interval in the preset browser or Settings.
+- **Full screen** expands only the visualizer. Press Escape or its exit button to leave, F to toggle, and Left/Right Arrow to change scenes while full screen.
+- Full-screen and visualizer changes affect visuals only; playback continues through the one persistent audio element.
+- Visualizers sleep while music is paused, the window is hidden, or Now Playing is off-screen. During sustained heavy scenes they automatically step from 60 to 45 or 30 FPS and reduce internal resolution, then restore quality gradually.
+- Low, Balanced, and High cap the internal canvas around 720p, 1440p, and 4K respectively. WebGL scenes request the high-performance GPU; open **Browse** to see the renderer WebView2 selected and the current FPS ceiling.
 
 ## Desktop behavior
 

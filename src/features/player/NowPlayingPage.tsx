@@ -1,21 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
-import { Artwork } from '../../components/Artwork';
 import { EmptyState, ErrorState, PageHeader } from '../../components/AsyncState';
 import { FavoriteButton, RatingControl } from '../../components/LibraryActions';
+import { AlbumLink, ArtistLink, TrackTagLinks } from '../../components/LibraryLinks';
 import { getLyrics } from '../../lib/tauri/library';
-import { PlayerSettings, Session } from '../../lib/tauri/types';
-import { VisualizerCanvas } from '../visualizer/VisualizerCanvas';
+import { Session } from '../../lib/tauri/types';
+import { VisualizerStage } from '../visualizer/VisualizerStage';
 import { currentQueueItem, usePlaybackStore } from './playbackStore';
-
-const MODES: Array<[PlayerSettings['visualizer'], string]> = [
-  ['bars', 'Frequency bars'],
-  ['mirror', 'Mirrored spectrum'],
-  ['wave', 'Oscilloscope'],
-  ['circular', 'Circular spectrum'],
-  ['ambient', 'Ambient glow'],
-];
 
 export function NowPlayingPage({ session }: { session: Session }) {
   const state = usePlaybackStore();
@@ -47,8 +39,13 @@ export function NowPlayingPage({ session }: { session: Session }) {
           <p className="eyebrow">Now playing</p>
           <h1>{track.title}</h1>
           <p className="muted">
-            {track.artist ?? 'Unknown artist'} · {track.album ?? 'Unknown album'}
+            <ArtistLink artistId={track.artistId} name={track.displayArtist ?? track.artist} />
+            {' · '}
+            <AlbumLink albumId={track.albumId} name={track.album} />
           </p>
+          <div className="tag-list now-playing-tags">
+            <TrackTagLinks track={track} limit={6} />
+          </div>
         </div>
         <div className="button-row">
           <FavoriteButton
@@ -63,38 +60,18 @@ export function NowPlayingPage({ session }: { session: Session }) {
               Open album
             </Link>
           )}
+          {track.artistId && (
+            <Link
+              className="secondary-button"
+              to={`/artists/${encodeURIComponent(track.artistId)}`}
+            >
+              Open artist
+            </Link>
+          )}
         </div>
       </PageHeader>
       <div className="now-playing-layout">
-        <section className="visualizer-panel">
-          <Artwork
-            className="now-playing-art"
-            proxyBaseUrl={session.proxyBaseUrl}
-            coverId={track.coverArt}
-            alt={`Cover for ${track.title}`}
-            size={720}
-          />
-          <VisualizerCanvas mode={state.visualizer} quality={state.visualizerQuality} />
-          <div className="visualizer-toolbar">
-            {MODES.map(([mode, label]) => (
-              <button
-                className={state.visualizer === mode ? 'is-active' : ''}
-                key={mode}
-                type="button"
-                aria-pressed={state.visualizer === mode}
-                onClick={() => state.setVisualizer(mode)}
-              >
-                {label}
-              </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => void document.documentElement.requestFullscreen?.()}
-            >
-              Full screen
-            </button>
-          </div>
-        </section>
+        <VisualizerStage session={session} track={track} />
         <section className="lyrics-panel">
           <header>
             <h2>Lyrics</h2>

@@ -7,7 +7,7 @@ use zeroize::Zeroizing;
 use crate::{
     app_state::AppState,
     error::{AppError, AppResult},
-    library_index::{LibraryIndexStatus, TrackQuery, TrackQueryResult},
+    library_index::{LibraryIndexStatus, TagSummary, TrackQuery, TrackQueryResult},
     local_data::{ListeningStatistics, PlaybackEventInput},
     mix::{MixInput, MixResult, generate_mix as build_mix},
     navidrome::{
@@ -296,6 +296,13 @@ pub async fn query_tracks(
     let client = state.client().await.ok_or_else(AppError::no_session)?;
     let profile_id = active_profile_id(&state).await?;
     state.library_index.query(&client, &profile_id, input).await
+}
+
+#[tauri::command]
+pub async fn tags(state: State<'_, AppState>) -> AppResult<Vec<TagSummary>> {
+    let client = state.client().await.ok_or_else(AppError::no_session)?;
+    let profile_id = active_profile_id(&state).await?;
+    state.library_index.tags(&client, &profile_id).await
 }
 
 #[tauri::command]

@@ -17,8 +17,10 @@ export interface DesktopControl {
     | 'volume'
     | 'open-mini'
     | 'show-main'
+    | 'navigate-main'
     | 'mini-ready';
   value?: number;
+  route?: string;
 }
 
 export interface SharedPlaybackState {

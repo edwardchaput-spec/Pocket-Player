@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 
 import { EmptyState, ErrorState } from '../../components/AsyncState';
 import { TrackTable } from '../../components/TrackTable';
+import { AlbumLink, ArtistLink } from '../../components/LibraryLinks';
 import { deletePlaylist, getPlaylist, replacePlaylist } from '../../lib/tauri/library';
 import { PlaylistDetail, Session } from '../../lib/tauri/types';
 import { usePlaybackStore } from '../player/playbackStore';
@@ -147,7 +148,14 @@ function PlaylistContent({ playlist, session }: { playlist: PlaylistDetail; sess
                 <li key={`${song.id}-${index}`}>
                   <span>
                     <strong>{song.title}</strong>
-                    <small>{song.artist ?? 'Unknown artist'}</small>
+                    <small className="library-inline-links">
+                      <ArtistLink
+                        artistId={song.artistId}
+                        name={song.displayArtist ?? song.artist}
+                      />
+                      {' · '}
+                      <AlbumLink albumId={song.albumId} name={song.album} />
+                    </small>
                   </span>
                   <span>
                     <button

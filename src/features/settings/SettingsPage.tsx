@@ -230,6 +230,45 @@ export function SettingsPage({ session, onLogout }: { session: Session; onLogout
               <option value={3}>High</option>
             </select>
           </label>
+          <label>
+            <span>Visualiser sensitivity · {player.visualizerSensitivity.toFixed(2)}×</span>
+            <input
+              type="range"
+              min="0.35"
+              max="2.5"
+              step="0.05"
+              value={player.visualizerSensitivity}
+              onChange={(event) => player.setVisualizerSensitivity(Number(event.target.value))}
+            />
+          </label>
+          <label>
+            <span>Automatic preset rotation</span>
+            <select
+              value={player.visualizerRotationSeconds}
+              onChange={(event) => player.setVisualizerRotationSeconds(Number(event.target.value))}
+            >
+              <option value={15}>Every 15 seconds</option>
+              <option value={30}>Every 30 seconds</option>
+              <option value={60}>Every minute</option>
+              <option value={120}>Every 2 minutes</option>
+            </select>
+          </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={player.visualizerAutoRotate}
+              onChange={(event) => player.setVisualizerAutoRotate(event.target.checked)}
+            />
+            Rotate visualiser presets automatically
+          </label>
+          <label className="checkbox-row">
+            <input
+              type="checkbox"
+              checked={player.visualizerRandomMode}
+              onChange={(event) => player.setVisualizerRandomMode(event.target.checked)}
+            />
+            Randomise automatic preset order
+          </label>
           <label className="checkbox-row">
             <input
               type="checkbox"

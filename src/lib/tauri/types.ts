@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { VISUALIZER_MODES } from '../../features/visualizer/visualizerPresets';
+
 const appErrorDataSchema = z.object({
   code: z.string(),
   message: z.string(),
@@ -41,8 +43,13 @@ export type Profile = z.infer<typeof profileSchema>;
 export const playerSettingsSchema = z.object({
   volume: z.number().min(0).max(1),
   muted: z.boolean(),
-  visualizer: z.enum(['bars', 'mirror', 'wave', 'circular', 'ambient']),
+  visualizer: z.enum(VISUALIZER_MODES),
   visualizerQuality: z.number().int().min(1).max(3),
+  visualizerSensitivity: z.number().min(0.35).max(2.5),
+  visualizerAutoRotate: z.boolean(),
+  visualizerRotationSeconds: z.number().int().min(10).max(300),
+  visualizerRandomMode: z.boolean(),
+  visualizerFavorites: z.array(z.enum(VISUALIZER_MODES)).max(VISUALIZER_MODES.length),
   theme: z.enum(['dark', 'light', 'system']),
   density: z.enum(['comfortable', 'compact']),
   notifications: z.boolean(),
@@ -146,6 +153,14 @@ export const genreSchema = z.object({
 });
 export type Genre = z.infer<typeof genreSchema>;
 
+export const tagSummarySchema = z.object({
+  name: z.string(),
+  songCount: z.number().int().nonnegative(),
+  albumCount: z.number().int().nonnegative(),
+  categories: z.array(z.enum(['Genre', 'Mood'])),
+});
+export type TagSummary = z.infer<typeof tagSummarySchema>;
+
 export const playlistSummarySchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -187,6 +202,7 @@ export type TrackQueryResult = z.infer<typeof trackQueryResultSchema>;
 export interface TrackQuery {
   query: string;
   genre?: string | undefined;
+  tag?: string | undefined;
   sortBy: TrackSortField;
   descending: boolean;
   offset: number;
@@ -238,6 +254,9 @@ export const listeningStatisticsSchema = z.object({
       trackId: z.string(),
       title: z.string(),
       artist: z.string().nullable().optional(),
+      artistId: z.string().nullable().optional(),
+      album: z.string().nullable().optional(),
+      albumId: z.string().nullable().optional(),
       plays: z.number().int().nonnegative(),
       listenedMs: z.number().nonnegative(),
     }),

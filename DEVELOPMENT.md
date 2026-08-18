@@ -48,6 +48,7 @@ npm run format:check     # TypeScript, CSS, JSON, and Markdown formatting
 npm run rust:fmt:check   # Rust formatting
 npm run rust:clippy      # Clippy with warnings denied
 npm run rust:test        # Rust unit and mock-server integration tests
+npm run shortcut         # Create/update Pocket Player.lnk on this user's Desktop
 npm run verify           # Every non-interactive frontend and Rust check
 npm run tauri build      # Release executable plus MSI and NSIS bundles
 ```
@@ -57,6 +58,17 @@ Use `npm.cmd` in place of `npm` for all commands if the PowerShell script shim i
 ```powershell
 npm.cmd run tauri dev
 ```
+
+## Desktop shortcut
+
+Build the self-contained production application once, then create the shortcut:
+
+```powershell
+npm.cmd run tauri build
+npm.cmd run shortcut
+```
+
+The shortcut launches `src-tauri\target\release\navidrome-desktop.exe` directly, without a terminal or development server. Installing the generated MSI or NSIS package is preferable for a normal release installation; rerun the shortcut command if the repository is moved.
 
 ## Local data and credentials
 

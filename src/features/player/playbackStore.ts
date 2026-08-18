@@ -26,6 +26,11 @@ interface PlaybackState {
   muted: boolean;
   visualizer: PlayerSettings['visualizer'];
   visualizerQuality: number;
+  visualizerSensitivity: number;
+  visualizerAutoRotate: boolean;
+  visualizerRotationSeconds: number;
+  visualizerRandomMode: boolean;
+  visualizerFavorites: PlayerSettings['visualizerFavorites'];
   theme: PlayerSettings['theme'];
   density: PlayerSettings['density'];
   notifications: boolean;
@@ -53,6 +58,11 @@ interface PlaybackState {
   setMuted: (muted: boolean) => void;
   setVisualizer: (visualizer: PlayerSettings['visualizer']) => void;
   setVisualizerQuality: (quality: number) => void;
+  setVisualizerSensitivity: (sensitivity: number) => void;
+  setVisualizerAutoRotate: (enabled: boolean) => void;
+  setVisualizerRotationSeconds: (seconds: number) => void;
+  setVisualizerRandomMode: (enabled: boolean) => void;
+  toggleVisualizerFavorite: (visualizer: PlayerSettings['visualizer']) => void;
   setTheme: (theme: PlayerSettings['theme']) => void;
   setDensity: (density: PlayerSettings['density']) => void;
   setNotifications: (enabled: boolean) => void;
@@ -74,6 +84,11 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   muted: false,
   visualizer: 'bars',
   visualizerQuality: 2,
+  visualizerSensitivity: 1,
+  visualizerAutoRotate: false,
+  visualizerRotationSeconds: 30,
+  visualizerRandomMode: false,
+  visualizerFavorites: [],
   theme: 'dark',
   density: 'comfortable',
   notifications: true,
@@ -222,6 +237,18 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   setVisualizer: (visualizer) => set({ visualizer }),
   setVisualizerQuality: (visualizerQuality) =>
     set({ visualizerQuality: Math.max(1, Math.min(3, visualizerQuality)) }),
+  setVisualizerSensitivity: (visualizerSensitivity) =>
+    set({ visualizerSensitivity: Math.max(0.35, Math.min(2.5, visualizerSensitivity)) }),
+  setVisualizerAutoRotate: (visualizerAutoRotate) => set({ visualizerAutoRotate }),
+  setVisualizerRotationSeconds: (visualizerRotationSeconds) =>
+    set({ visualizerRotationSeconds: Math.max(10, Math.min(300, visualizerRotationSeconds)) }),
+  setVisualizerRandomMode: (visualizerRandomMode) => set({ visualizerRandomMode }),
+  toggleVisualizerFavorite: (visualizer) =>
+    set((state) => ({
+      visualizerFavorites: state.visualizerFavorites.includes(visualizer)
+        ? state.visualizerFavorites.filter((mode) => mode !== visualizer)
+        : [...state.visualizerFavorites, visualizer],
+    })),
   setTheme: (theme) => set({ theme }),
   setDensity: (density) => set({ density }),
   setNotifications: (notifications) => set({ notifications }),

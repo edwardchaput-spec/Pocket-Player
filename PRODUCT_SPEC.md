@@ -116,6 +116,7 @@ The main application shell should expose the following destinations:
 - **Artists**
 - **Tracks**
 - **Genres**
+- **Tags**
 - **Playlists**
 - **Now Playing / Queue**
 - **Statistics** (later phase)
@@ -185,6 +186,7 @@ Search must:
 - Show artwork where available.
 - Make it possible to play a track, play an album, enqueue, play next, favourite, and open details.
 - Preserve the query when navigating back.
+- Link every result's artist and album metadata to the corresponding library detail view when Navidrome supplies an opaque ID.
 
 ### 8.4 Albums
 
@@ -215,6 +217,8 @@ Track views must support:
 - Sort and filter controls.
 - Context actions: play, play next, add to queue, start track mix, favourite, rate, add to playlist, open album, and open artist.
 - String identifiers throughout the application. Track, album, artist, playlist, and library IDs must never be coerced to integers.
+- Exact navigation by indexed genre and mood tags, with tag-level track and album counts.
+- Consistent artist, album, genre, and tag links across search, discovery, queue, playback, playlist, and statistics surfaces.
 
 ### 8.7 Playlists
 

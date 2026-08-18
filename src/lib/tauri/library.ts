@@ -15,6 +15,7 @@ import {
   playlistSummarySchema,
   searchResultsSchema,
   songSchema,
+  tagSummarySchema,
   TrackQuery,
   trackQueryResultSchema,
 } from './types';
@@ -68,6 +69,8 @@ export const refreshLibraryIndex = () =>
 
 export const queryTracks = (input: TrackQuery) =>
   invokeParsed('query_tracks', trackQueryResultSchema, { input });
+
+export const getTags = () => invokeParsed('tags', z.array(tagSummarySchema));
 
 export const setStarred = (
   itemId: string,

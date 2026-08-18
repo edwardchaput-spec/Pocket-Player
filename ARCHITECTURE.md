@@ -701,7 +701,9 @@ A local playback event should record:
 
 No password, authenticated URL, or media bytes belong in the database.
 
-The in-memory library index is rebuilt from the SQLite cache at session activation and after a bounded server refresh. It precomputes normalized searchable text across core metadata, genres, moods, comments, file type, display fields, and MusicBrainz ID. Filtering and sorting happen over the complete index before pagination so numeric duration and technical-metadata ordering are correct across the whole library.
+The in-memory library index is rebuilt from the SQLite cache at session activation and after a bounded server refresh. It precomputes normalized searchable text across core metadata, genres, moods, comments, file type, display fields, and MusicBrainz ID. It also normalizes and deduplicates exact genre/mood tag keys and precomputes a tag catalogue with track, distinct-album, and category counts. Filtering and sorting happen over the complete index before pagination so exact tag navigation, numeric duration, and technical-metadata ordering are correct across the whole library.
+
+Artist IDs, album IDs, and tag values remain typed navigation data in React. Shared link components URL-encode opaque IDs and are reused by grids, track tables, the queue, Now Playing, statistics, playlists, and the persistent/mini players. Missing IDs degrade to non-interactive labels rather than guessed searches.
 
 ## 13. Window and process architecture
 
@@ -764,6 +766,12 @@ export interface VisualizerPlugin {
 
 `AudioAnalysisFrame` should contain only data required by rendering, such as frequency bins, waveform samples, timestamp, and normalised energy bands.
 
+The implemented preset registry contains trusted Canvas 2D and WebGL 2 scenes. Canvas owns classic spectra, particle systems, waveform landscapes, album geometry, and kaleidoscope effects. WebGL owns the neon tunnel, frequency city, particle galaxy, liquid plasma, and adaptive AI Conductor. Both read the same analyser frames and are cross-faded at the view layer.
+
+The feature tracker derives bounded bass, mid, treble, energy, centroid, flux, and beat values. AI Conductor uses these values only as a local procedural scene director; it neither records raw audio nor calls an AI/network service. See `docs/decisions/ADR-009-trusted-hybrid-visualizer-engine.md`.
+
+The visualizer stage, rather than the whole application shell, owns Fullscreen API entry. The stage keeps its preset browser, sensitivity, quality, favourite, random, and automatic-rotation controls available while full screen.
+
 ### 14.3 Safety and performance
 
 - Bundle trusted modules at build time for the initial release.
@@ -773,6 +781,12 @@ export interface VisualizerPlugin {
 - Detect sustained frame drops and lower quality.
 - Suspend analysis when no visualiser is visible.
 - Respect reduced motion.
+- Stop animation and analyser reads while playback is paused, the document is hidden, or the stage is outside the viewport.
+- Use an adaptive 60/45/30 FPS governor with gradual recovery, bounded particle complexity, and quality-tier pixel budgets (720p, 1440p, and 4K).
+- Request the high-performance WebGL adapter and expose WebView2's reported renderer in the preset browser for local verification.
+- Freeze the outgoing scene during a short cross-fade so preset changes do not run two render loops.
+- Fall back to the Canvas presentation if WebGL 2 cannot be initialized.
+- Keep preset identifiers allowlisted in Rust persistence so corrupt or untrusted mode names cannot become executable content.
 
 ## 15. Mix engine architecture
 
@@ -1122,6 +1136,12 @@ npm run tauri build
 **Decision:** The main window retains the only playback owner; mini-player and tray surfaces exchange sanitized state/control events.
 
 **Reason:** Prevents duplicate streams and duplicate scrobbles. See `docs/decisions/ADR-008-one-player-multiple-windows.md`.
+
+### ADR-009: Visualizers are trusted hybrid renderers
+
+**Decision:** Use built-in Canvas 2D scenes and first-party WebGL 2 shaders over the shared analyser, with no downloaded preset code.
+
+**Reason:** Delivers particle and GPU effects without expanding the audio, credential, or third-party code trust boundary. See `docs/decisions/ADR-009-trusted-hybrid-visualizer-engine.md`.
 
 ## 22. Milestone map
 
