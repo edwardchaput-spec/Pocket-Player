@@ -1,4 +1,4 @@
-import { emit, emitTo, listen, UnlistenFn } from '@tauri-apps/api/event';
+import { emitTo, UnlistenFn } from '@tauri-apps/api/event';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
@@ -15,11 +15,13 @@ export interface DesktopControl {
     | 'next'
     | 'seek'
     | 'volume'
+    | 'mute'
     | 'open-mini'
     | 'show-main'
     | 'navigate-main'
     | 'mini-ready';
   value?: number;
+  muted?: boolean;
   route?: string;
 }
 
@@ -46,8 +48,10 @@ export function isMiniPlayerWindow(): boolean {
 export async function openMiniPlayer(): Promise<void> {
   const existing = await WebviewWindow.getByLabel('mini-player');
   if (existing) {
+    await existing.unminimize();
     await existing.show();
     await existing.setFocus();
+    await requestPlaybackState();
     return;
   }
   const window = new WebviewWindow('mini-player', {
@@ -58,7 +62,8 @@ export async function openMiniPlayer(): Promise<void> {
     minWidth: 480,
     minHeight: 170,
     resizable: true,
-    decorations: true,
+    decorations: false,
+    shadow: true,
     alwaysOnTop: true,
   });
   await new Promise<void>((resolve, reject) => {
@@ -69,6 +74,8 @@ export async function openMiniPlayer(): Promise<void> {
 
 export const sendDesktopControl = (control: DesktopControl) =>
   emitTo('main', 'desktop-control', control);
+
+export const requestPlaybackState = () => sendDesktopControl({ action: 'mini-ready' });
 
 export async function showMainWindow(): Promise<void> {
   const main = await WebviewWindow.getByLabel('main');
@@ -88,12 +95,15 @@ export const listenDesktopControl = (
     handler(event.payload),
   );
 
-export const emitPlaybackState = (state: SharedPlaybackState) => emit('playback-state', state);
+export const emitPlaybackState = (state: SharedPlaybackState) =>
+  emitTo('mini-player', 'playback-state', state);
 
 export const listenPlaybackState = (
   handler: (state: SharedPlaybackState) => void,
 ): Promise<UnlistenFn> =>
-  listen<SharedPlaybackState>('playback-state', (event) => handler(event.payload));
+  WebviewWindow.getCurrent().listen<SharedPlaybackState>('playback-state', (event) =>
+    handler(event.payload),
+  );
 
 export const showTrackNotification = (title: string, body: string) =>
   invokeVoid('show_track_notification', { title, body });

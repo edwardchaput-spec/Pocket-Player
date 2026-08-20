@@ -32,6 +32,7 @@ interface PlaybackState {
   visualizerRandomMode: boolean;
   visualizerFavorites: PlayerSettings['visualizerFavorites'];
   theme: PlayerSettings['theme'];
+  customColors: PlayerSettings['customColors'];
   density: PlayerSettings['density'];
   notifications: boolean;
   closeToTray: boolean;
@@ -64,6 +65,8 @@ interface PlaybackState {
   setVisualizerRandomMode: (enabled: boolean) => void;
   toggleVisualizerFavorite: (visualizer: PlayerSettings['visualizer']) => void;
   setTheme: (theme: PlayerSettings['theme']) => void;
+  setCustomColor: (token: keyof PlayerSettings['customColors'], color: string | null) => void;
+  resetCustomColors: () => void;
   setDensity: (density: PlayerSettings['density']) => void;
   setNotifications: (enabled: boolean) => void;
   setCloseToTray: (enabled: boolean) => void;
@@ -90,6 +93,7 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   visualizerRandomMode: false,
   visualizerFavorites: [],
   theme: 'dark',
+  customColors: { accent: null, background: null, surface: null },
   density: 'comfortable',
   notifications: true,
   closeToTray: false,
@@ -124,71 +128,115 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   playNext: (tracks) => {
     const state = get();
     const next = insertNext({ items: state.queue, currentIndex: state.currentIndex }, tracks);
-    set({ queue: next.items, currentIndex: next.currentIndex });
+    set({
+      queue: next.items,
+      currentIndex: next.currentIndex,
+      // An insertion relative to shuffled order makes that visible order canonical.
+      unshuffledQueue: state.shuffleMode ? next.items : state.unshuffledQueue,
+    });
   },
   append: (tracks) => {
     const state = get();
     const next = appendQueue({ items: state.queue, currentIndex: state.currentIndex }, tracks);
+    const additions = next.items.slice(state.queue.length);
     set({
       queue: next.items,
       currentIndex: next.currentIndex,
       status: state.currentIndex == null && next.currentIndex != null ? 'loading' : state.status,
+      unshuffledQueue: state.unshuffledQueue
+        ? [...state.unshuffledQueue, ...additions]
+        : state.unshuffledQueue,
     });
   },
   next: (reason = 'manual') => {
     const state = get();
     if (reason === 'ended' && state.repeatMode === 'one' && state.currentIndex != null) {
-      const queue = [...state.queue];
-      const current = queue[state.currentIndex];
-      if (current)
-        queue[state.currentIndex] = { ...current, playbackSessionId: crypto.randomUUID() };
-      set({ queue, status: 'loading', position: 0, error: null });
+      const renewed = renewPlaybackSession(state.queue, state.currentIndex);
+      set({
+        queue: renewed.queue,
+        status: 'loading',
+        position: 0,
+        error: null,
+        unshuffledQueue: mirrorPlaybackSession(state.unshuffledQueue, renewed.item),
+      });
       return;
     }
     let index = nextIndex({ items: state.queue, currentIndex: state.currentIndex });
     if (index == null && state.repeatMode === 'queue' && state.queue.length > 0) index = 0;
+    const renewed = renewPlaybackSession(state.queue, index);
     set({
+      queue: renewed.queue,
       currentIndex: index,
       status: index == null ? 'ended' : 'loading',
       position: 0,
       error: null,
+      unshuffledQueue: mirrorPlaybackSession(state.unshuffledQueue, renewed.item),
     });
   },
   previous: () => {
     const state = get();
     const index = previousIndex({ items: state.queue, currentIndex: state.currentIndex });
+    const renewed = renewPlaybackSession(state.queue, index);
     set({
+      queue: renewed.queue,
       currentIndex: index,
       status: index == null ? 'idle' : 'loading',
       position: 0,
       error: null,
+      unshuffledQueue: mirrorPlaybackSession(state.unshuffledQueue, renewed.item),
     });
   },
   jumpTo: (index) => {
     const state = get();
     if (index < 0 || index >= state.queue.length) return;
-    set({ currentIndex: index, status: 'loading', position: 0, error: null });
+    const renewed = renewPlaybackSession(state.queue, index);
+    set({
+      queue: renewed.queue,
+      currentIndex: index,
+      status: 'loading',
+      position: 0,
+      error: null,
+      unshuffledQueue: mirrorPlaybackSession(state.unshuffledQueue, renewed.item),
+    });
   },
   removeAt: (index) => {
     const state = get();
     const current = state.currentIndex == null ? undefined : state.queue[state.currentIndex];
+    const removedOccurrenceId = state.queue[index]?.occurrenceId;
     const next = removeQueueItem({ items: state.queue, currentIndex: state.currentIndex }, index);
-    const nextCurrent = next.currentIndex == null ? undefined : next.items[next.currentIndex];
+    let queue = next.items;
+    let nextCurrent = next.currentIndex == null ? undefined : queue[next.currentIndex];
+    let unshuffledQueue = removedOccurrenceId
+      ? (state.unshuffledQueue?.filter((item) => item.occurrenceId !== removedOccurrenceId) ?? null)
+      : state.unshuffledQueue;
+    if (next.currentIndex != null && current?.occurrenceId !== nextCurrent?.occurrenceId) {
+      const renewed = renewPlaybackSession(queue, next.currentIndex);
+      queue = renewed.queue;
+      nextCurrent = renewed.item;
+      unshuffledQueue = mirrorPlaybackSession(unshuffledQueue, renewed.item);
+    }
     set({
-      queue: next.items,
+      queue,
       currentIndex: next.currentIndex,
       status:
-        next.items.length === 0
+        queue.length === 0
           ? 'idle'
           : current?.occurrenceId !== nextCurrent?.occurrenceId
             ? 'loading'
             : state.status,
+      shuffleMode: queue.length === 0 ? false : state.shuffleMode,
+      unshuffledQueue: queue.length === 0 ? null : unshuffledQueue,
     });
   },
   move: (from, to) => {
     const state = get();
     const next = moveQueueItem({ items: state.queue, currentIndex: state.currentIndex }, from, to);
-    set({ queue: next.items, currentIndex: next.currentIndex });
+    set({
+      queue: next.items,
+      currentIndex: next.currentIndex,
+      // A deliberate reorder replaces the hidden pre-shuffle order.
+      unshuffledQueue: state.shuffleMode ? next.items : state.unshuffledQueue,
+    });
   },
   cycleRepeat: () =>
     set((state) => ({
@@ -197,10 +245,10 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
     })),
   toggleShuffle: () => {
     const state = get();
-    if (state.shuffleMode && state.unshuffledQueue) {
+    if (state.shuffleMode) {
       const currentId =
         state.currentIndex == null ? undefined : state.queue[state.currentIndex]?.occurrenceId;
-      const queue = state.unshuffledQueue;
+      const queue = state.unshuffledQueue ?? state.queue;
       set({
         queue,
         currentIndex: currentId
@@ -250,6 +298,13 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
         : [...state.visualizerFavorites, visualizer],
     })),
   setTheme: (theme) => set({ theme }),
+  setCustomColor: (token, color) => {
+    if (color !== null && !/^#[0-9a-fA-F]{6}$/.test(color)) return;
+    set((state) => ({
+      customColors: { ...state.customColors, [token]: color?.toLowerCase() ?? null },
+    }));
+  },
+  resetCustomColors: () => set({ customColors: { accent: null, background: null, surface: null } }),
   setDensity: (density) => set({ density }),
   setNotifications: (notifications) => set({ notifications }),
   setCloseToTray: (closeToTray) => set({ closeToTray }),
@@ -276,4 +331,23 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
 
 export function currentQueueItem(state: Pick<PlaybackState, 'queue' | 'currentIndex'>) {
   return state.currentIndex == null ? undefined : state.queue[state.currentIndex];
+}
+
+function renewPlaybackSession(queue: QueueItem[], index: number | null) {
+  if (index == null) return { queue, item: undefined };
+  const current = queue[index];
+  if (!current) return { queue, item: undefined };
+  const item = { ...current, playbackSessionId: crypto.randomUUID() };
+  const renewedQueue = [...queue];
+  renewedQueue[index] = item;
+  return { queue: renewedQueue, item };
+}
+
+function mirrorPlaybackSession(original: QueueItem[] | null, renewed: QueueItem | undefined) {
+  if (!original || !renewed) return original;
+  return original.map((item) =>
+    item.occurrenceId === renewed.occurrenceId
+      ? { ...item, playbackSessionId: renewed.playbackSessionId }
+      : item,
+  );
 }

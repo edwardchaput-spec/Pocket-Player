@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { AlbumGrid } from '../../components/AlbumGrid';
@@ -11,8 +10,8 @@ import { useDebouncedValue } from '../../lib/useDebouncedValue';
 import { usePlaybackStore } from '../player/playbackStore';
 
 export function SearchPage({ session }: { session: Session }) {
-  const [params, setParams] = useSearchParams();
-  const [value, setValue] = useState(params.get('q') ?? '');
+  const [params] = useSearchParams();
+  const value = params.get('q') ?? '';
   const query = useDebouncedValue(value.trim(), 250);
   const playback = usePlaybackStore();
   const results = useQuery({
@@ -29,25 +28,20 @@ export function SearchPage({ session }: { session: Session }) {
       <PageHeader>
         <div>
           <p className="eyebrow">Library</p>
-          <h1>Search</h1>
+          <h1>Search results</h1>
         </div>
+        {results.data && query ? (
+          <p>
+            {results.data.artists.length + results.data.albums.length + results.data.songs.length}{' '}
+            matches for “{query}”
+          </p>
+        ) : null}
       </PageHeader>
-      <label className="search-box">
-        <span className="sr-only">Search artists, albums, and tracks</span>
-        <input
-          autoFocus
-          type="search"
-          value={value}
-          placeholder="Search artists, albums, and tracks"
-          onChange={(event) => {
-            const next = event.target.value;
-            setValue(next);
-            setParams(next.trim() ? { q: next } : {}, { replace: true });
-          }}
-        />
-      </label>
       {!query ? (
-        <EmptyState title="Search your library" detail="Results appear after you start typing." />
+        <EmptyState
+          title="Search your library"
+          detail="Use the search field above. Results stay here while you explore."
+        />
       ) : results.isPending ? (
         <div className="state-panel">
           <p>Searching…</p>
@@ -87,7 +81,7 @@ export function SearchPage({ session }: { session: Session }) {
               <h2>Tracks</h2>
               <TrackTable
                 tracks={results.data.songs}
-                onPlay={(index) => playback.replaceAndPlay(results.data.songs, index)}
+                onPlay={(index, displayedTracks) => playback.replaceAndPlay(displayedTracks, index)}
                 onPlayNext={(track) => playback.playNext([track])}
                 onAddToQueue={(track) => playback.append([track])}
               />

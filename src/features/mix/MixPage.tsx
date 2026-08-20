@@ -7,6 +7,7 @@ import { TrackTable } from '../../components/TrackTable';
 import { generateMix, getGenres, getTags } from '../../lib/tauri/library';
 import { MixInput, MixRecipe, Session } from '../../lib/tauri/types';
 import { usePlaybackStore } from '../player/playbackStore';
+import './MixPage.css';
 
 const RECIPES: Array<[MixRecipe, string]> = [
   ['trackMix', 'Track Mix'],
@@ -40,9 +41,21 @@ export function MixPage({ session }: { session: Session }) {
     queryKey: ['profile', session.profile.profileId, 'tags'],
     queryFn: getTags,
   });
+  const indexedTags = tags.data ?? [];
+  const moodTags = indexedTags.filter((item) => item.categories.includes('Mood'));
+  const visibleTags = moodTags.length > 0 ? moodTags : indexedTags;
+  const showingGenreFallback = indexedTags.length > 0 && moodTags.length === 0;
   const mix = useMutation({ mutationFn: (input: MixInput) => generateMix(input) });
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    const tagCategories = new Map(indexedTags.map((item) => [item.name, item.categories]));
+    const genreTags: string[] = [];
+    const nonGenreTags: string[] = [];
+    for (const tag of excludedTags) {
+      const categories = tagCategories.get(tag);
+      if (categories?.includes('Genre')) genreTags.push(tag);
+      if (!categories || categories.includes('Mood')) nonGenreTags.push(tag);
+    }
     mix.mutate({
       recipe,
       seedTrackId: params.get('track') ?? undefined,
@@ -51,9 +64,14 @@ export function MixPage({ session }: { session: Session }) {
       year,
       length,
       adventure,
-      excludedGenres,
-      excludedTags,
+      excludedGenres: [...new Set([...excludedGenres, ...genreTags])],
+      excludedTags: nonGenreTags,
     });
+  };
+  const toggleExcludedTag = (tag: string, checked: boolean) => {
+    setExcludedTags((current) =>
+      checked ? [...new Set([...current, tag])] : current.filter((item) => item !== tag),
+    );
   };
   const tracks = mix.data?.items.map((item) => item.track) ?? [];
   return (
@@ -118,24 +136,51 @@ export function MixPage({ session }: { session: Session }) {
             ))}
           </select>
         </label>
-        <label>
-          <span>Exclude tags</span>
-          <select
-            multiple
-            value={excludedTags}
-            onChange={(event) =>
-              setExcludedTags([...event.target.selectedOptions].map((option) => option.value))
-            }
-          >
-            {(tags.data ?? [])
-              .filter((item) => !item.categories.includes('Genre'))
-              .map((item) => (
-                <option key={item.name} value={item.name}>
-                  {item.name}
-                </option>
-              ))}
-          </select>
-        </label>
+        <fieldset className="mix-tag-field">
+          <legend>Exclude tags</legend>
+          {tags.isPending ? (
+            <div className="mix-tag-state" role="status">
+              Loading indexed tags…
+            </div>
+          ) : tags.isError ? (
+            <div className="mix-tag-state is-error">
+              <span role="alert">Could not load tags: {tags.error.message}</span>
+              <button type="button" onClick={() => void tags.refetch()}>
+                Retry
+              </button>
+            </div>
+          ) : visibleTags.length === 0 ? (
+            <div className="mix-tag-state">No indexed genre or mood tags were found.</div>
+          ) : (
+            <div className="mix-tag-options">
+              {visibleTags.map((item) => {
+                const categories = item.categories.join(' + ');
+                return (
+                  <label className="mix-tag-option" key={item.name.toLocaleLowerCase()}>
+                    <input
+                      aria-label={`Exclude ${item.name} (${categories})`}
+                      type="checkbox"
+                      checked={excludedTags.includes(item.name)}
+                      onChange={(event) => toggleExcludedTag(item.name, event.target.checked)}
+                    />
+                    <span>
+                      <strong>{item.name}</strong>
+                      <small>
+                        {categories} · {item.songCount.toLocaleString()}{' '}
+                        {item.songCount === 1 ? 'track' : 'tracks'}
+                      </small>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          <small className="mix-field-hint">
+            {showingGenreFallback
+              ? 'This library has genre-classified tags only; Genre entries mirror the list above.'
+              : 'Mood tags come from the local library index; dual-category entries are marked.'}
+          </small>
+        </fieldset>
         <label>
           <span>Tracks: {length}</span>
           <input
@@ -147,8 +192,11 @@ export function MixPage({ session }: { session: Session }) {
             onChange={(event) => setLength(Number(event.target.value))}
           />
         </label>
-        <label className="adventure-control">
-          <span>Familiar</span>
+        <label className="mix-adventure-control">
+          <span className="mix-range-legend">
+            <span>Familiar</span>
+            <span>Adventurous</span>
+          </span>
           <input
             aria-label="Familiar to adventurous"
             type="range"
@@ -158,9 +206,8 @@ export function MixPage({ session }: { session: Session }) {
             value={adventure}
             onChange={(event) => setAdventure(Number(event.target.value))}
           />
-          <span>Adventurous</span>
         </label>
-        <button className="primary-button" disabled={mix.isPending}>
+        <button className="primary-button mix-build-button" type="submit" disabled={mix.isPending}>
           {mix.isPending ? 'Building mix…' : 'Build mix'}
         </button>
       </form>
@@ -206,7 +253,7 @@ export function MixPage({ session }: { session: Session }) {
               <TrackTable
                 detailed
                 tracks={tracks}
-                onPlay={(index) => playback.replaceAndPlay(tracks, index)}
+                onPlay={(index, displayedTracks) => playback.replaceAndPlay(displayedTracks, index)}
                 onPlayNext={(track) => playback.playNext([track])}
                 onAddToQueue={(track) => playback.append([track])}
               />

@@ -40,6 +40,15 @@ export const profileSchema = z.object({
 });
 export type Profile = z.infer<typeof profileSchema>;
 
+const customThemeColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+export const customThemeColorsSchema = z.object({
+  accent: customThemeColorSchema.nullable(),
+  background: customThemeColorSchema.nullable(),
+  surface: customThemeColorSchema.nullable(),
+});
+export type CustomThemeColors = z.infer<typeof customThemeColorsSchema>;
+
 export const playerSettingsSchema = z.object({
   volume: z.number().min(0).max(1),
   muted: z.boolean(),
@@ -51,6 +60,7 @@ export const playerSettingsSchema = z.object({
   visualizerRandomMode: z.boolean(),
   visualizerFavorites: z.array(z.enum(VISUALIZER_MODES)).max(VISUALIZER_MODES.length),
   theme: z.enum(['dark', 'light', 'system']),
+  customColors: customThemeColorsSchema,
   density: z.enum(['comfortable', 'compact']),
   notifications: z.boolean(),
   closeToTray: z.boolean(),
@@ -221,6 +231,7 @@ export type TrackSortField =
   | 'playCount'
   | 'rating'
   | 'starred'
+  | 'format'
   | 'bitRate'
   | 'bitDepth'
   | 'samplingRate'

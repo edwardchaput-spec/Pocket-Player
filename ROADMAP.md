@@ -34,7 +34,7 @@ Updated 17 August 2026. This document records what is implemented, what was vali
 
 ### Phase 5 — visual and audio polish
 
-- One shared Web Audio analyser and 21 trusted visualizers spanning classic spectra, particles, pseudo-3D scenes, WebGL shaders, a MilkDrop-inspired kaleidoscope, and the locally adaptive AI Conductor.
+- One shared Web Audio analyser and 22 trusted visualizers spanning classic spectra, particles, pseudo-3D scenes, WebGL shaders, a MilkDrop-inspired kaleidoscope, the locally adaptive AI Conductor, and the token-and-attention-inspired Sol5.6.
 - A categorized preset browser, favourites, sensitivity, quality, automatic rotation, random mode, smooth transitions, visualizer-only full screen, GPU renderer diagnostics, adaptive frame/resolution/complexity control, reduced-motion handling, off-screen and paused suspension, and allocation-conscious particle/audio tracking.
 - A production Desktop shortcut workflow that launches the release executable without PowerShell or a development server.
 - Plain and synchronized OpenSubsonic lyrics with current-line highlighting and safe unavailable/error states.

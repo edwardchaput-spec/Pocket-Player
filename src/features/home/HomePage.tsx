@@ -171,9 +171,7 @@ export function HomePage({
             ) : favourites.data.songs.length ? (
               <TrackTable
                 tracks={favourites.data.songs.slice(0, 20)}
-                onPlay={(index) =>
-                  playback.replaceAndPlay(favourites.data.songs.slice(0, 20), index)
-                }
+                onPlay={(index, displayedTracks) => playback.replaceAndPlay(displayedTracks, index)}
                 onPlayNext={(track) => playback.playNext([track])}
                 onAddToQueue={(track) => playback.append([track])}
               />

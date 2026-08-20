@@ -13,6 +13,17 @@ const PROFILE_KEY: &str = "currentProfile";
 const PLAYER_KEY: &str = "player";
 const QUEUE_KEY: &str = "queue";
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CustomThemeColors {
+    #[serde(default)]
+    pub accent: Option<String>,
+    #[serde(default)]
+    pub background: Option<String>,
+    #[serde(default)]
+    pub surface: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerSettings {
@@ -34,6 +45,8 @@ pub struct PlayerSettings {
     pub visualizer_favorites: Vec<String>,
     #[serde(default = "default_theme")]
     pub theme: String,
+    #[serde(default)]
+    pub custom_colors: CustomThemeColors,
     #[serde(default = "default_density")]
     pub density: String,
     #[serde(default = "default_notifications")]
@@ -77,6 +90,7 @@ impl Default for PlayerSettings {
             visualizer_random_mode: false,
             visualizer_favorites: Vec::new(),
             theme: default_theme(),
+            custom_colors: CustomThemeColors::default(),
             density: default_density(),
             notifications: default_notifications(),
             close_to_tray: false,
@@ -140,12 +154,13 @@ fn valid_player_settings(settings: &PlayerSettings) -> bool {
         && settings.visualizer_sensitivity.is_finite()
         && (0.35..=2.5).contains(&settings.visualizer_sensitivity)
         && (10..=300).contains(&settings.visualizer_rotation_seconds)
-        && settings.visualizer_favorites.len() <= 21
+        && settings.visualizer_favorites.len() <= 22
         && settings
             .visualizer_favorites
             .iter()
             .all(|mode| valid_visualizer(mode) && favorite_modes.insert(mode.as_str()))
         && matches!(settings.theme.as_str(), "dark" | "light" | "system")
+        && valid_custom_theme_colors(&settings.custom_colors)
         && matches!(settings.density.as_str(), "comfortable" | "compact")
         && valid_home_sections(&settings.home_sections)
         && settings.pinned_playlist_ids.len() <= 100
@@ -153,6 +168,18 @@ fn valid_player_settings(settings: &PlayerSettings) -> bool {
             .pinned_playlist_ids
             .iter()
             .all(|id| !id.is_empty() && id.len() <= 512)
+}
+
+fn valid_custom_theme_colors(colors: &CustomThemeColors) -> bool {
+    [&colors.accent, &colors.background, &colors.surface]
+        .into_iter()
+        .all(|color| color.as_deref().is_none_or(valid_custom_theme_color))
+}
+
+fn valid_custom_theme_color(color: &str) -> bool {
+    color.len() == 7
+        && color.starts_with('#')
+        && color[1..].bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn default_visualizer() -> String {
@@ -195,6 +222,7 @@ fn valid_visualizer(mode: &str) -> bool {
             | "album3d"
             | "kaleidoscope"
             | "ai"
+            | "sol56"
     )
 }
 
@@ -322,6 +350,7 @@ mod tests {
         assert!(valid_visualizer("sparks"));
         assert!(valid_visualizer("neonTunnel"));
         assert!(valid_visualizer("ai"));
+        assert!(valid_visualizer("sol56"));
         assert!(!valid_visualizer("downloaded-script"));
 
         let duplicate_favorites = PlayerSettings {
@@ -334,5 +363,41 @@ mod tests {
             ..PlayerSettings::default()
         };
         assert!(valid_player_settings(&valid_favorites));
+    }
+
+    #[test]
+    fn custom_theme_colors_are_optional_strict_hex_values() {
+        let custom = PlayerSettings {
+            custom_colors: CustomThemeColors {
+                accent: Some("#aB12f0".to_owned()),
+                background: Some("#101218".to_owned()),
+                surface: Some("#181b24".to_owned()),
+            },
+            ..PlayerSettings::default()
+        };
+        assert!(valid_player_settings(&custom));
+
+        for invalid in ["836dff", "#fff", "#12345g", "red", "#12345678"] {
+            let settings = PlayerSettings {
+                custom_colors: CustomThemeColors {
+                    accent: Some(invalid.to_owned()),
+                    ..CustomThemeColors::default()
+                },
+                ..PlayerSettings::default()
+            };
+            assert!(!valid_player_settings(&settings), "accepted {invalid}");
+        }
+    }
+
+    #[test]
+    fn settings_saved_before_custom_colors_migrate_to_theme_defaults() {
+        let mut stored = serde_json::to_value(PlayerSettings::default()).unwrap();
+        stored.as_object_mut().unwrap().remove("customColors");
+
+        let migrated: PlayerSettings = serde_json::from_value(stored).unwrap();
+        assert!(migrated.custom_colors.accent.is_none());
+        assert!(migrated.custom_colors.background.is_none());
+        assert!(migrated.custom_colors.surface.is_none());
+        assert!(valid_player_settings(&migrated));
     }
 }
