@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import { restoreSession } from '../lib/tauri/auth';
 import { AppError } from '../lib/tauri/types';
+import { BrandMark } from '../components/BrandMark';
 import { LoginScreen } from '../features/auth/LoginScreen';
 import { MiniPlayerWindow } from '../features/player/MiniPlayerWindow';
 import { isMiniPlayerWindow } from '../lib/tauri/desktop';
@@ -35,7 +36,9 @@ function MainApplication() {
   if (loading) {
     return (
       <main className="startup-screen" aria-busy="true">
-        <div className="brand-mark">♪</div>
+        <div className="brand-mark">
+          <BrandMark />
+        </div>
         <p>Opening your library…</p>
       </main>
     );

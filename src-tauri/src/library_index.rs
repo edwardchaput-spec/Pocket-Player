@@ -430,6 +430,7 @@ fn validate_sort(sort_by: &str) -> AppResult<()> {
         "playCount",
         "rating",
         "starred",
+        "format",
         "bitRate",
         "bitDepth",
         "samplingRate",
@@ -460,6 +461,7 @@ fn compare_songs(left: &Song, right: &Song, field: &str) -> Ordering {
         "playCount" => left.play_count.cmp(&right.play_count),
         "rating" => left.user_rating.cmp(&right.user_rating),
         "starred" => left.starred.is_some().cmp(&right.starred.is_some()),
+        "format" => compare_format(left, right),
         "bitRate" => left.bit_rate.cmp(&right.bit_rate),
         "bitDepth" => left.bit_depth.cmp(&right.bit_depth),
         "samplingRate" => left.sampling_rate.cmp(&right.sampling_rate),
@@ -477,6 +479,27 @@ fn compare_text(left: Option<&str>, right: Option<&str>) -> Ordering {
     left.unwrap_or_default()
         .to_lowercase()
         .cmp(&right.unwrap_or_default().to_lowercase())
+}
+
+fn compare_format(left: &Song, right: &Song) -> Ordering {
+    compare_text(file_format(left), file_format(right))
+        .then_with(|| left.sampling_rate.cmp(&right.sampling_rate))
+        .then_with(|| left.bit_depth.cmp(&right.bit_depth))
+        .then_with(|| left.channel_count.cmp(&right.channel_count))
+}
+
+fn file_format(song: &Song) -> Option<&str> {
+    song.suffix
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .or_else(|| {
+            song.content_type
+                .as_deref()
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| value.rsplit('/').next().unwrap_or(value))
+        })
 }
 
 #[cfg(test)]
@@ -500,6 +523,56 @@ mod tests {
         let short = song("short", "Short", 59, "Rock");
         let long = song("long", "Long", 600, "Rock");
         assert_eq!(compare_songs(&short, &long, "duration"), Ordering::Less);
+    }
+
+    #[test]
+    fn format_sort_uses_codec_then_sample_rate_bit_depth_and_channels() {
+        let compact_disc: Song = serde_json::from_value(serde_json::json!({
+            "id": "compact-disc",
+            "title": "Compact disc",
+            "contentType": "audio/flac",
+            "samplingRate": 44100,
+            "bitDepth": 16,
+            "channelCount": 2
+        }))
+        .expect("compact disc fixture");
+        let high_resolution: Song = serde_json::from_value(serde_json::json!({
+            "id": "high-resolution",
+            "title": "High resolution",
+            "suffix": "FLAC",
+            "samplingRate": 96000,
+            "bitDepth": 24,
+            "channelCount": 2
+        }))
+        .expect("high resolution fixture");
+        let surround: Song = serde_json::from_value(serde_json::json!({
+            "id": "surround",
+            "title": "Surround",
+            "suffix": "flac",
+            "samplingRate": 96000,
+            "bitDepth": 24,
+            "channelCount": 6
+        }))
+        .expect("surround fixture");
+        let lossy: Song = serde_json::from_value(serde_json::json!({
+            "id": "lossy",
+            "title": "Lossy",
+            "suffix": "mp3",
+            "samplingRate": 44100,
+            "channelCount": 2
+        }))
+        .expect("lossy fixture");
+
+        assert_eq!(
+            compare_songs(&compact_disc, &high_resolution, "format"),
+            Ordering::Less
+        );
+        assert_eq!(
+            compare_songs(&high_resolution, &surround, "format"),
+            Ordering::Less
+        );
+        assert_eq!(compare_songs(&surround, &lossy, "format"), Ordering::Less);
+        assert!(validate_sort("format").is_ok());
     }
 
     #[test]

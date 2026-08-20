@@ -67,7 +67,7 @@ export function GenrePage({ session }: { session: Session }) {
           <TrackTable
             detailed
             tracks={tracks}
-            onPlay={(index) => playback.replaceAndPlay(tracks, index)}
+            onPlay={(index, displayedTracks) => playback.replaceAndPlay(displayedTracks, index)}
             onPlayNext={(track) => playback.playNext([track])}
             onAddToQueue={(track) => playback.append([track])}
           />

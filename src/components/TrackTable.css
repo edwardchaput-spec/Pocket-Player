@@ -1,0 +1,54 @@
+.track-table .track-sort-button {
+  width: 100%;
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font-weight: 750;
+  text-align: inherit;
+  white-space: nowrap;
+}
+
+.track-table th.numeric .track-sort-button {
+  justify-content: flex-end;
+}
+
+.track-table .track-sort-button:hover,
+.track-table .track-sort-button:focus-visible,
+.track-table th[aria-sort='ascending'] .track-sort-button,
+.track-table th[aria-sort='descending'] .track-sort-button {
+  color: var(--text);
+}
+
+.track-table .track-sort-indicator {
+  width: 0.8rem;
+  flex: 0 0 0.8rem;
+  color: color-mix(in srgb, var(--text-muted), transparent 30%);
+  font-size: 0.72rem;
+  line-height: 1;
+  text-align: center;
+}
+
+.track-table th[aria-sort='ascending'] .track-sort-indicator,
+.track-table th[aria-sort='descending'] .track-sort-indicator {
+  color: var(--accent-strong);
+}
+
+.track-table .track-format {
+  min-width: 150px;
+  max-width: 210px;
+  color: var(--text-muted);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
+.track-table .track-bitrate,
+.track-table .track-size {
+  min-width: 84px;
+  font-size: 0.76rem;
+}

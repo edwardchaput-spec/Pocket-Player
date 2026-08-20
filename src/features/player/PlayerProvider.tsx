@@ -1,4 +1,4 @@
-import { PropsWithChildren, useEffect, useRef, useState } from 'react';
+import { PropsWithChildren, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import {
@@ -17,9 +17,11 @@ import {
   openMiniPlayer,
   showTrackNotification,
 } from '../../lib/tauri/desktop';
-import { currentQueueItem, usePlaybackStore } from './playbackStore';
+import { currentQueueItem, type PlaybackStatus, usePlaybackStore } from './playbackStore';
 import { ScrobbleController } from './ScrobbleController';
 import { AudioAnalysisProvider } from './AudioAnalysisContext';
+import { applyCustomThemeColors } from '../settings/themeColors';
+import { QueuePopover } from '../queue/QueuePopover';
 
 export function PlayerProvider({ children, session }: PropsWithChildren<{ session: Session }>) {
   const navigate = useNavigate();
@@ -28,6 +30,7 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
   const pendingSeekRef = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const notifiedPlaybackSessionRef = useRef<string | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const state = usePlaybackStore();
   const current = currentQueueItem(state);
@@ -73,12 +76,19 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
       audio.load();
       return;
     }
+    const shouldStartPlaying = state.status === 'loading';
     pendingSeekRef.current = state.position;
     audio.src = `${session.proxyBaseUrl}/stream/${encodeURIComponent(current.track.id)}`;
     audio.load();
-    void audio.play().catch(() => {
+    if (shouldStartPlaying) {
+      void audio.play().catch(() => {
+        state.setStatus('paused');
+      });
+    } else {
+      // A restored queue is useful startup state, not a request to resume playback.
+      audio.pause();
       state.setStatus('paused');
-    });
+    }
     return () => {
       reporter?.stopped(performance.now());
       if (reporter && reporter.listened() >= 5 && !reporter.isCompletedOrPending()) {
@@ -96,7 +106,7 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
     };
     // Store actions are stable and the current occurrence is the source boundary.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.occurrenceId, session.proxyBaseUrl]);
+  }, [current?.playbackSessionId, session.proxyBaseUrl]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -115,6 +125,7 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
         visualizerRandomMode: state.visualizerRandomMode,
         visualizerFavorites: state.visualizerFavorites,
         theme: state.theme,
+        customColors: state.customColors,
         density: state.density,
         notifications: state.notifications,
         closeToTray: state.closeToTray,
@@ -134,6 +145,7 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
     state.visualizerRandomMode,
     state.visualizerFavorites,
     state.theme,
+    state.customColors,
     state.density,
     state.notifications,
     state.closeToTray,
@@ -144,15 +156,18 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
   useEffect(() => {
     document.documentElement.dataset.theme = state.theme;
     document.documentElement.dataset.density = state.density;
-  }, [state.theme, state.density]);
+    applyCustomThemeColors(document.documentElement.style, state.customColors);
+  }, [state.theme, state.customColors, state.density]);
 
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | undefined;
     void listenDesktopControl((control) => {
       const audio = audioRef.current;
       const playback = usePlaybackStore.getState();
-      if (control.action === 'open-mini') void openMiniPlayer();
-      else if (control.action === 'show-main') {
+      if (control.action === 'open-mini') {
+        void openMiniPlayer();
+      } else if (control.action === 'show-main') {
         void currentDesktopWindow().show();
         void currentDesktopWindow().setFocus();
       } else if (
@@ -163,25 +178,38 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
         void navigate(control.route);
         void currentDesktopWindow().show();
         void currentDesktopWindow().setFocus();
-      } else if (control.action === 'previous') playback.previous();
-      else if (control.action === 'next') playback.next('manual');
-      else if ((control.action === 'play-pause' || control.action === 'play') && audio?.paused)
-        void audio.play();
-      else if (
-        (control.action === 'play-pause' || control.action === 'pause') &&
-        audio &&
-        !audio.paused
-      )
-        audio.pause();
-      else if (control.action === 'seek' && audio && control.value != null)
-        audio.currentTime = Math.max(0, Math.min(control.value, audio.duration || control.value));
-      else if (control.action === 'volume' && control.value != null)
+      } else if (control.action === 'previous') {
+        playback.previous();
+      } else if (control.action === 'next') {
+        playback.next('manual');
+      } else if (control.action === 'play-pause') {
+        if (isPlaybackActive(playback.status)) pauseAudio(audio, playback);
+        else if (audio) playAudio(audio, playback);
+      } else if (control.action === 'play' && audio?.paused) {
+        playAudio(audio, playback);
+      } else if (control.action === 'pause') {
+        pauseAudio(audio, playback);
+      } else if (control.action === 'seek' && audio && control.value != null) {
+        const knownDuration = Number.isFinite(audio.duration) ? audio.duration : playback.duration;
+        const position = Math.max(0, Math.min(control.value, knownDuration || control.value));
+        audio.currentTime = position;
+        playback.setTiming(position, knownDuration || 0);
+      } else if (control.action === 'volume' && control.value != null) {
         playback.setVolume(control.value);
+      } else if (control.action === 'mute' && control.muted != null) {
+        playback.setMuted(control.muted);
+      }
       if (control.action === 'mini-ready') void publishPlaybackState(session.proxyBaseUrl);
-    }).then((dispose) => {
-      unlisten = dispose;
-    });
-    return () => unlisten?.();
+    })
+      .then((dispose) => {
+        if (disposed) dispose();
+        else unlisten = dispose;
+      })
+      .catch(() => undefined);
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, [navigate, session.proxyBaseUrl]);
 
   useEffect(() => {
@@ -199,6 +227,7 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
   ]);
 
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | undefined;
     void currentDesktopWindow()
       .onCloseRequested((event) => {
@@ -208,19 +237,36 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
         }
       })
       .then((dispose) => {
-        unlisten = dispose;
-      });
-    return () => unlisten?.();
+        if (disposed) dispose();
+        else unlisten = dispose;
+      })
+      .catch(() => undefined);
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, []);
 
   useEffect(() => {
-    if (!current) return;
-    if (state.notifications) {
+    if (!current) {
+      notifiedPlaybackSessionRef.current = null;
+      return;
+    }
+    if (
+      state.notifications &&
+      isPlaybackActive(state.status) &&
+      notifiedPlaybackSessionRef.current !== current.playbackSessionId
+    ) {
+      notifiedPlaybackSessionRef.current = current.playbackSessionId;
       void showTrackNotification(
         current.track.title,
         [current.track.artist, current.track.album].filter(Boolean).join(' · '),
       ).catch(() => undefined);
     }
+  }, [current, state.notifications, state.status]);
+
+  useEffect(() => {
+    if (!current) return;
     if ('mediaSession' in navigator && typeof MediaMetadata !== 'undefined') {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: current.track.title,
@@ -236,7 +282,7 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
           : [],
       });
     }
-  }, [current, session.proxyBaseUrl, state.notifications]);
+  }, [current, session.proxyBaseUrl]);
 
   useEffect(() => {
     if (!('mediaSession' in navigator)) return;
@@ -314,7 +360,10 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
       <audio
         ref={audioRef}
         crossOrigin="anonymous"
-        onLoadStart={() => state.setStatus('loading')}
+        onLoadStart={() => {
+          const playback = usePlaybackStore.getState();
+          if (playback.status !== 'paused') playback.setStatus('loading');
+        }}
         onPlaying={() => {
           const audio = audioRef.current;
           if (audio && !audioContextRef.current && typeof window.AudioContext !== 'undefined') {
@@ -392,17 +441,27 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
   );
 }
 
-function PlayerBar({
-  audioRef,
-  proxyBaseUrl,
-}: {
+interface PlayerBarProps {
   audioRef: React.RefObject<HTMLAudioElement | null>;
   proxyBaseUrl: string;
-}) {
+}
+
+function PlayerBar(props: PlayerBarProps) {
+  const hasCurrent = usePlaybackStore(
+    (state) => state.currentIndex != null && state.queue[state.currentIndex] != null,
+  );
+  return hasCurrent ? <ActivePlayerBar {...props} /> : null;
+}
+
+function ActivePlayerBar({ audioRef, proxyBaseUrl }: PlayerBarProps) {
   const state = usePlaybackStore();
+  const [queueOpen, setQueueOpen] = useState(false);
+  const queueTriggerRef = useRef<HTMLButtonElement>(null);
+  const closeQueue = useCallback(() => setQueueOpen(false), []);
   const current = currentQueueItem(state);
   if (!current) return null;
   const track = current.track;
+  const playbackActive = isPlaybackActive(state.status);
   const art = track.coverArt
     ? `${proxyBaseUrl}/cover/${encodeURIComponent(track.coverArt)}?size=96`
     : undefined;
@@ -445,15 +504,15 @@ function PlayerBar({
           <button
             type="button"
             className="play-toggle"
-            aria-label={state.status === 'playing' ? 'Pause' : 'Play'}
+            aria-label={playbackActive ? 'Pause' : 'Play'}
             onClick={() => {
               const audio = audioRef.current;
               if (!audio) return;
-              if (audio.paused) void audio.play();
-              else audio.pause();
+              if (playbackActive) pauseAudio(audio, usePlaybackStore.getState());
+              else playAudio(audio, usePlaybackStore.getState());
             }}
           >
-            {state.status === 'playing' ? 'Ⅱ' : '▶'}
+            {playbackActive ? 'Ⅱ' : '▶'}
           </button>
           <button type="button" aria-label="Next track" onClick={() => state.next('manual')}>
             ⏭
@@ -495,14 +554,21 @@ function PlayerBar({
         <Link className="visualizer-link" to="/now-playing#visualizer" aria-label="Open visualiser">
           Visualiser
         </Link>
-        <Link
-          className="queue-link"
-          to="/queue"
-          aria-label={`Open queue with ${state.queue.length} items`}
-        >
-          Queue{' '}
-          {state.currentIndex == null ? '' : `${state.currentIndex + 1}/${state.queue.length}`}
-        </Link>
+        <div className="queue-popover-anchor">
+          <button
+            ref={queueTriggerRef}
+            className="queue-link"
+            type="button"
+            aria-label={`${queueOpen ? 'Close' : 'Open'} queue with ${state.queue.length} ${state.queue.length === 1 ? 'item' : 'items'}`}
+            aria-expanded={queueOpen}
+            aria-controls="player-queue-popover"
+            onClick={() => setQueueOpen((open) => !open)}
+          >
+            Queue{' '}
+            {state.currentIndex == null ? '' : `${state.currentIndex + 1}/${state.queue.length}`}
+          </button>
+          {queueOpen && <QueuePopover open onClose={closeQueue} triggerRef={queueTriggerRef} />}
+        </div>
         <button
           type="button"
           aria-label={state.muted ? 'Unmute' : 'Mute'}
@@ -555,6 +621,26 @@ async function publishPlaybackState(proxyBaseUrl: string): Promise<void> {
     queueLength: state.queue.length,
     currentIndex: state.currentIndex,
   }).catch(() => undefined);
+}
+
+function playAudio(
+  audio: HTMLAudioElement,
+  playback: ReturnType<typeof usePlaybackStore.getState>,
+) {
+  playback.setError(null);
+  void audio.play().catch(() => playback.setStatus('paused'));
+}
+
+function pauseAudio(
+  audio: HTMLAudioElement | null,
+  playback: ReturnType<typeof usePlaybackStore.getState>,
+) {
+  audio?.pause();
+  playback.setStatus('paused');
+}
+
+function isPlaybackActive(status: PlaybackStatus): boolean {
+  return status === 'loading' || status === 'playing' || status === 'stalled';
 }
 
 function formatClock(value: number): string {

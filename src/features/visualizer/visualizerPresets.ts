@@ -20,6 +20,7 @@ export const VISUALIZER_MODES = [
   'album3d',
   'kaleidoscope',
   'ai',
+  'sol56',
 ] as const;
 
 export type VisualizerMode = (typeof VISUALIZER_MODES)[number];
@@ -181,6 +182,13 @@ export const VISUALIZER_PRESETS: VisualizerPreset[] = [
     description: 'A local audio director interprets mood, motion and impact.',
     category: 'Adaptive',
     renderer: 'webgl',
+  },
+  {
+    id: 'sol56',
+    name: 'Sol5.6',
+    description: 'Spectral tokens flow through attention, memory and a luminous inference core.',
+    category: 'Adaptive',
+    renderer: 'canvas2d',
   },
 ];
 

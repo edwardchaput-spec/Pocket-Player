@@ -7,6 +7,7 @@ import {
   calculateRenderSize,
   shouldRenderVisualizer,
 } from './performanceGovernor';
+import { drawSol56 } from './sol56Renderer';
 import { createWebGLScene, isWebGLMode } from './webglRenderer';
 import { VisualizerMode } from './visualizerPresets';
 
@@ -36,6 +37,7 @@ interface SceneState {
   ridges: number[][];
   random: () => number;
   lastBurst: number;
+  seed: number;
 }
 
 export interface VisualizerDiagnostics {
@@ -312,6 +314,20 @@ function drawCanvasScene(
       break;
     case 'kaleidoscope':
       drawKaleidoscope(context, waveform, width, height, features, time, quality);
+      break;
+    case 'sol56':
+      drawSol56(
+        context,
+        frequency,
+        waveform,
+        features,
+        width,
+        height,
+        time,
+        quality,
+        reducedMotion,
+        state.seed / 0xffffffff,
+      );
       break;
     default:
       drawAmbient(context, width, height, time, features);
@@ -894,6 +910,7 @@ function createSceneState(seed: number): SceneState {
     ridges: [],
     random: mulberry32(seed),
     lastBurst: -10,
+    seed,
   };
 }
 

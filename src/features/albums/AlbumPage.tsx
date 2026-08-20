@@ -93,7 +93,7 @@ export function AlbumPage({ session }: { session: Session }) {
       ) : (
         <TrackTable
           tracks={tracks}
-          onPlay={(index) => replaceAndPlay(tracks, index)}
+          onPlay={(index, displayedTracks) => replaceAndPlay(displayedTracks, index)}
           onPlayNext={(track) => usePlaybackStore.getState().playNext([track])}
           onAddToQueue={(track) => usePlaybackStore.getState().append([track])}
         />

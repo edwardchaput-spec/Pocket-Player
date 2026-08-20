@@ -7,6 +7,8 @@ import { clearLocalLibraryData, exportDiagnostics } from '../../lib/tauri/playba
 import { getPlaylists } from '../../lib/tauri/library';
 import { AppError, HomeSection, Session } from '../../lib/tauri/types';
 import { usePlaybackStore } from '../player/playbackStore';
+import { getThemeColorDefaults, isStrictHexColor } from './themeColors';
+import './SettingsPage.css';
 
 export function SettingsPage({ session, onLogout }: { session: Session; onLogout: () => void }) {
   const [testing, setTesting] = useState(false);
@@ -16,6 +18,8 @@ export function SettingsPage({ session, onLogout }: { session: Session; onLogout
   const queryClient = useQueryClient();
   const player = usePlaybackStore();
   const profile = session.profile;
+  const themeColorDefaults = getThemeColorDefaults(player.theme);
+  const hasCustomColors = Object.values(player.customColors).some((color) => color !== null);
   const playlists = useQuery({
     queryKey: ['profile', profile.profileId, 'playlists'],
     queryFn: getPlaylists,
@@ -285,6 +289,69 @@ export function SettingsPage({ session, onLogout }: { session: Session; onLogout
             />
             Keep playing in the tray when the main window closes
           </label>
+        </div>
+      </section>
+      <section className="settings-card">
+        <div className="custom-colour-heading">
+          <div>
+            <h2>Custom colours</h2>
+            <p className="muted">
+              These optional colours layer over your selected {player.theme} theme. Text colours
+              adapt automatically when you replace the background; keep the surface at a similar
+              brightness for consistent contrast across cards and controls.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="secondary-button"
+            disabled={!hasCustomColors}
+            onClick={() => player.resetCustomColors()}
+          >
+            Reset to theme defaults
+          </button>
+        </div>
+        <div className="custom-colour-layout">
+          <div className="custom-colour-grid">
+            {(
+              [
+                ['accent', 'Accent', 'Buttons, focus and active details'],
+                ['background', 'Background', 'The main application canvas'],
+                ['surface', 'Surface', 'Cards, panels and raised controls'],
+              ] as const
+            ).map(([token, label, detail]) => {
+              const customColor = player.customColors[token];
+              return (
+                <label className="custom-colour-control" key={token}>
+                  <span className="custom-colour-label">
+                    {label}
+                    <small>
+                      {detail} · {customColor?.toUpperCase() ?? 'Theme default'}
+                    </small>
+                  </span>
+                  <input
+                    type="color"
+                    aria-label={`${label} colour`}
+                    value={customColor ?? themeColorDefaults[token]}
+                    onChange={(event) => {
+                      if (isStrictHexColor(event.target.value)) {
+                        player.setCustomColor(token, event.target.value);
+                      }
+                    }}
+                  />
+                </label>
+              );
+            })}
+          </div>
+          <div className="theme-colour-preview" role="img" aria-label="Theme colour preview">
+            <div className="theme-colour-preview-surface">
+              <span>Live preview</span>
+              <div>
+                <strong>Pocket Player</strong>
+                <small>Custom colour palette</small>
+              </div>
+              <div className="theme-colour-preview-accent" aria-hidden="true" />
+            </div>
+          </div>
         </div>
       </section>
       <section className="settings-card">

@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { AudioFeatureTracker, averageBand } from './audioFeatures';
-import { nextVisualizerMode, VISUALIZER_MODES, VISUALIZER_PRESETS } from './visualizerPresets';
+import {
+  nextVisualizerMode,
+  presetFor,
+  VISUALIZER_MODES,
+  VISUALIZER_PRESETS,
+} from './visualizerPresets';
 
 describe('visualizer audio interpretation', () => {
   it('measures independent frequency regions', () => {
@@ -38,5 +43,15 @@ describe('visualizer audio interpretation', () => {
       VISUALIZER_MODES.length,
     );
     expect(VISUALIZER_PRESETS.every((preset) => preset.description.length > 20)).toBe(true);
+  });
+
+  it('registers Sol5.6 as a trusted local adaptive scene', () => {
+    expect(presetFor('sol56')).toEqual({
+      id: 'sol56',
+      name: 'Sol5.6',
+      description: 'Spectral tokens flow through attention, memory and a luminous inference core.',
+      category: 'Adaptive',
+      renderer: 'canvas2d',
+    });
   });
 });

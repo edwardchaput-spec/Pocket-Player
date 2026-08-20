@@ -15,11 +15,11 @@
 
 ## Browse and play
 
-- Use Home, Search, Albums, Artists, Tracks, Genres, Tags, or Playlists from the sidebar.
+- Use Home, Albums, Artists, Tracks, Genres, Tags, or Playlists from the sidebar. The library search stays at the top-right on every page; press Ctrl+K or `/` to focus it.
 - Open an album and choose **Play album**, **Shuffle**, or a track’s play action.
 - Use **Play next** and **Add to queue** throughout the library.
-- Open Queue to jump, reorder with keyboard-accessible arrows, remove, clear, shuffle, or change repeat mode.
-- Open the mini player from the player bar or tray. It controls the same audio session; it does not start another stream.
+- Choose **Queue** in the player bar to open its compact panel above the bar without leaving the current page. Jump, reorder with keyboard-accessible arrows, remove, clear, shuffle, or change repeat mode there.
+- Open the mini player from the player bar or tray. Its play, pause, previous, next, seek, volume, and mute controls mirror the main player and control the same audio session; it does not start another stream.
 
 ## Find and sort tracks quickly
 
@@ -27,8 +27,8 @@ Open **Tracks**. The first visit builds the complete metadata index and later la
 
 - Search matches titles, artists, albums, genres, multi-value genres, moods, comments, file type, display artist/album artist, and MusicBrainz ID.
 - Filter by genre.
-- Sort ascending or descending by every offered metadata column. **Length** is a numeric duration sort, so `9:00` correctly follows `10:00` rather than being compared as text.
-- Technical fields include codec/file type, bitrate, bit depth, sample rate, channel count, and file size when Navidrome returns them.
+- Sort ascending or descending from every displayed metadata heading in track tables. **Length** is numeric, so `9:00` correctly precedes `10:00` rather than being compared as text.
+- Technical metadata is split into **Format** (for example, FLAC 44.1 kHz), **Bitrate**, and **Size**. Format sorting also considers sample rate, bit depth, and channel count when Navidrome returns them.
 - Choose **Refresh index** after a large server scan or metadata retag.
 
 The index contains metadata only. Audio remains on Navidrome and streams on demand.
@@ -46,18 +46,21 @@ The index contains metadata only. Audio remains on Navidrome and streams on dema
 - Create and delete playlists from Playlists.
 - In a playlist, add tracks, move them up/down, remove them, and save. Server smart playlists may reject edits and remain server-controlled.
 - Pin playlists and choose Home section order/visibility in Settings.
+- In Settings, choose dark, light, or Windows-following appearance, then optionally layer custom accent, background, and surface colours over it. The preview updates live; **Reset to theme defaults** removes all three overrides.
 
 ## Discovery and statistics
 
 - Track Mix offers general, radio, genre, decade, recent, forgotten-favourite, rediscovery, and low-play recipes.
 - The familiarity slider shifts the balance without disabling diversity safeguards.
+- **Exclude tags** lists indexed moods, including dual Genre/Mood tags, and falls back to indexed genres when the library has no mood metadata.
 - Each generated row explains why it was selected; warnings explain unavailable sources.
 - Statistics are explicitly based only on playback observed by this desktop application, not every Navidrome client.
 
 ## Lyrics and visualisers
 
 - Now Playing displays plain or synchronized lyrics when Navidrome exposes the OpenSubsonic lyrics endpoint.
-- Open **Now Playing** and choose **Browse** to explore 21 visualizers grouped into Classic, Particles, 3D & shaders, and Adaptive categories.
+- Open **Now Playing** and choose **Browse** to explore 22 visualizers grouped into Classic, Particles, 3D & shaders, and Adaptive categories.
+- **Sol5.6** turns the live spectrum into tokens, attention paths, memory rails, and a luminous inference core. It is entirely local and does not record or transmit audio.
 - Particle scenes include Hyperdrive, Beat sparks, Cosmic dust, Chromatic fountain, Album orbit, Neon rain, and Ribbon trails.
 - GPU and pseudo-3D scenes include Neon tunnel, Audio landscape, Pulse geometry, Frequency city, Particle galaxy, Liquid plasma, and Album dimension. Kaleidoscope provides a MilkDrop-inspired radial treatment.
 - **AI Conductor** interprets frequency balance, energy, spectral motion, and beats locally, then blends galaxy, tunnel, and plasma treatments. It does not upload audio or contact an AI service.
@@ -74,6 +77,7 @@ The index contains metadata only. Audio remains on Navidrome and streams on dema
 - Optional track-change notifications and close-to-tray are controlled in Settings.
 - The tray provides show, mini-player, previous, play/pause, next, and quit actions.
 - Starting a second copy focuses the existing application.
+- Restarting restores the previous queue and position in a paused state, ready when you choose Play.
 
 ## Data and privacy
 

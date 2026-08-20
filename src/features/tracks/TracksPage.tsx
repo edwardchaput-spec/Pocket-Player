@@ -2,7 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useEffect, useRef, useState } from 'react';
 
 import { EmptyState, ErrorState, PageHeader } from '../../components/AsyncState';
-import { TrackTable } from '../../components/TrackTable';
+import { TrackTable, TrackTableSort, TrackTableSortKey } from '../../components/TrackTable';
 import { getGenres, queryTracks, refreshLibraryIndex } from '../../lib/tauri/library';
 import { AppError, Session, TrackSortField } from '../../lib/tauri/types';
 import { useDebouncedValue } from '../../lib/useDebouncedValue';
@@ -21,6 +21,7 @@ const SORT_OPTIONS: Array<[TrackSortField, string]> = [
   ['playCount', 'Play count'],
   ['rating', 'Rating'],
   ['starred', 'Favourite'],
+  ['format', 'Format'],
   ['bitRate', 'Bit rate'],
   ['bitDepth', 'Bit depth'],
   ['samplingRate', 'Sample rate'],
@@ -30,6 +31,32 @@ const SORT_OPTIONS: Array<[TrackSortField, string]> = [
   ['created', 'Date added'],
   ['bpm', 'BPM'],
 ];
+
+const TABLE_SORT_FIELDS: Record<TrackTableSortKey, TrackSortField> = {
+  title: 'title',
+  artist: 'artist',
+  album: 'album',
+  tags: 'genre',
+  duration: 'duration',
+  playCount: 'playCount',
+  rating: 'rating',
+  format: 'format',
+  bitRate: 'bitRate',
+  size: 'size',
+};
+
+const TABLE_SORT_KEYS: Partial<Record<TrackSortField, TrackTableSortKey>> = {
+  title: 'title',
+  artist: 'artist',
+  album: 'album',
+  genre: 'tags',
+  duration: 'duration',
+  playCount: 'playCount',
+  rating: 'rating',
+  format: 'format',
+  bitRate: 'bitRate',
+  size: 'size',
+};
 
 export function TracksPage({ session }: { session: Session }) {
   const client = useQueryClient();
@@ -77,6 +104,10 @@ export function TracksPage({ session }: { session: Session }) {
   });
   const loadedTracks = tracks.data?.pages.flatMap((page) => page.tracks) ?? [];
   const total = tracks.data?.pages[0]?.total ?? 0;
+  const tableSortKey = TABLE_SORT_KEYS[sortBy];
+  const tableSort: TrackTableSort | null = tableSortKey
+    ? { key: tableSortKey, direction: descending ? 'descending' : 'ascending' }
+    : null;
   const { fetchNextPage, hasNextPage, isFetchingNextPage } = tracks;
   const loadMoreRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -183,8 +214,14 @@ export function TracksPage({ session }: { session: Session }) {
         <>
           <TrackTable
             detailed
+            manualSorting
+            sort={tableSort}
             tracks={loadedTracks}
-            onPlay={(index) => playback.replaceAndPlay(loadedTracks, index)}
+            onSortChange={(next) => {
+              setSortBy(TABLE_SORT_FIELDS[next.key]);
+              setDescending(next.direction === 'descending');
+            }}
+            onPlay={(index, displayedTracks) => playback.replaceAndPlay(displayedTracks, index)}
             onPlayNext={(track) => playback.playNext([track])}
             onAddToQueue={(track) => playback.append([track])}
           />

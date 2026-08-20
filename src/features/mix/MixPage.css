@@ -1,0 +1,108 @@
+.mix-tag-field {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-2);
+  align-self: stretch;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.mix-tag-field legend {
+  padding: 0;
+}
+
+.mix-tag-options {
+  min-height: 88px;
+  max-height: 132px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+
+.mix-builder .mix-tag-option {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: center;
+  padding: 6px 7px;
+  border-radius: 4px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.mix-builder .mix-tag-option:hover {
+  background: var(--surface-hover);
+}
+
+.mix-tag-option input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.mix-tag-option span {
+  min-width: 0;
+  display: grid;
+}
+
+.mix-tag-option strong,
+.mix-tag-option small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mix-tag-option small,
+.mix-field-hint {
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.mix-tag-state {
+  min-height: 88px;
+  display: grid;
+  gap: var(--space-2);
+  place-content: center;
+  padding: var(--space-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.mix-tag-state.is-error {
+  color: var(--danger);
+}
+
+.mix-tag-state button {
+  justify-self: center;
+}
+
+.mix-builder .mix-adventure-control {
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.mix-range-legend {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.mix-adventure-control input,
+.mix-build-button {
+  min-width: 0;
+  width: 100%;
+  margin: 0;
+}

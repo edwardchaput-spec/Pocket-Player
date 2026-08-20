@@ -25,6 +25,7 @@ export const sessionFixture: Session = {
     visualizerRandomMode: false,
     visualizerFavorites: [],
     theme: 'dark',
+    customColors: { accent: null, background: null, surface: null },
     density: 'comfortable',
     notifications: true,
     closeToTray: false,

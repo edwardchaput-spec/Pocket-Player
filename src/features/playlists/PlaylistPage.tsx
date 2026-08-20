@@ -134,7 +134,7 @@ function PlaylistContent({ playlist, session }: { playlist: PlaylistDetail; sess
         <>
           <TrackTable
             tracks={songs}
-            onPlay={(index) => playback.replaceAndPlay(songs, index)}
+            onPlay={(index, displayedTracks) => playback.replaceAndPlay(displayedTracks, index)}
             onPlayNext={(track) => playback.playNext([track])}
             onAddToQueue={(track) => playback.append([track])}
           />

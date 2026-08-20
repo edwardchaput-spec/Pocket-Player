@@ -1,17 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Scoped permissions for the main and controller-only mini-player windows",
-  "windows": ["main", "mini-player"],
+  "description": "Permissions required by the main playback-owner window",
+  "windows": ["main"],
   "permissions": [
     "core:default",
     "core:webview:allow-create-webview-window",
     "core:window:allow-create",
     "core:window:allow-show",
     "core:window:allow-hide",
-    "core:window:allow-close",
     "core:window:allow-set-focus",
-    "core:window:allow-set-always-on-top",
     "core:window:allow-unminimize"
   ]
 }

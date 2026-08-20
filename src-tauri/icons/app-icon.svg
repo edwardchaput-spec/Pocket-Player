@@ -1,5 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#151722"/>
-  <circle cx="256" cy="256" r="166" fill="#7557ff"/>
-  <path d="M212 151v210c0 34-28 61-63 61s-63-27-63-61 28-61 63-61c13 0 24 3 34 9V188l207-42v171c0 34-28 61-63 61s-63-27-63-61 28-61 63-61c13 0 24 3 34 9v-82z" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="tile" x1="88" y1="62" x2="430" y2="466" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#947BFF"/>
+      <stop offset="0.52" stop-color="#7057E6"/>
+      <stop offset="1" stop-color="#4935AF"/>
+    </linearGradient>
+    <linearGradient id="edge" x1="92" y1="62" x2="401" y2="439" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.42"/>
+      <stop offset="0.45" stop-color="#FFFFFF" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#1B1168" stop-opacity="0.36"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="116" fill="#11131C"/>
+  <rect x="34" y="34" width="444" height="444" rx="103" fill="url(#tile)"/>
+  <rect x="37" y="37" width="438" height="438" rx="100" stroke="url(#edge)" stroke-width="6"/>
+  <g transform="translate(32 32) scale(7)">
+    <path d="M21 20v-6" stroke="#9EF2D4" stroke-width="4" stroke-linecap="round"/>
+    <path d="M32 20V9" stroke="#9EF2D4" stroke-width="4" stroke-linecap="round"/>
+    <path d="M43 20v-7" stroke="#9EF2D4" stroke-width="4" stroke-linecap="round"/>
+    <path d="M13 20h38v17.7C51 46 44.3 52.1 32 56 19.7 52.1 13 46 13 37.7V20Z" fill="#FBFAFF"/>
+    <path d="M13 23c9.5 4.4 28.5 4.4 38 0" stroke="#D9D2FF" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="m28.5 31 10 6.5-10 6.5V31Z" fill="#6048D5"/>
+  </g>
 </svg>

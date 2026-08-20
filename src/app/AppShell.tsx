@@ -1,6 +1,7 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
+import { BrandMark } from '../components/BrandMark';
 import { Session } from '../lib/tauri/types';
 import { AlbumPage } from '../features/albums/AlbumPage';
 import { AlbumsPage } from '../features/albums/AlbumsPage';
@@ -22,13 +23,54 @@ import { TracksPage } from '../features/tracks/TracksPage';
 import { TagPage } from '../features/tags/TagPage';
 import { TagsPage } from '../features/tags/TagsPage';
 
+const NAV_ITEMS = [
+  { to: '/home', label: 'Home', glyph: '◇' },
+  { to: '/albums', label: 'Albums', glyph: '▣' },
+  { to: '/artists', label: 'Artists', glyph: '◎' },
+  { to: '/tracks', label: 'Tracks', glyph: '≋' },
+  { to: '/genres', label: 'Genres', glyph: '⌁' },
+  { to: '/tags', label: 'Tags', glyph: '⌗' },
+  { to: '/playlists', label: 'Playlists', glyph: '≡' },
+  { to: '/queue', label: 'Queue', glyph: '↥' },
+  { to: '/now-playing', label: 'Now Playing', glyph: '▶' },
+  { to: '/statistics', label: 'Statistics', glyph: '∿' },
+  { to: '/mix', label: 'Track Mix', glyph: '✦' },
+  { to: '/settings', label: 'Settings', glyph: '⌘' },
+] as const;
+
 export function AppShell({ session, onLogout }: { session: Session; onLogout: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [search, setSearch] = useState(new URLSearchParams(location.search).get('q') ?? '');
+  const searchInput = useRef<HTMLInputElement>(null);
+  const routeSearch = new URLSearchParams(location.search).get('q') ?? '';
+  const searchValue = location.pathname === '/search' ? routeSearch : search;
+
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const isTyping =
+        target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.isContentEditable;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        searchInput.current?.focus();
+        searchInput.current?.select();
+      } else if (!isTyping && event.key === '/') {
+        event.preventDefault();
+        searchInput.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', focusSearch);
+    return () => window.removeEventListener('keydown', focusSearch);
+  }, []);
+
+  const showSearchResults = (value: string, replace = location.pathname === '/search') => {
+    const query = value.trim();
+    void navigate(`/search${query ? `?q=${encodeURIComponent(query)}` : ''}`, { replace });
+  };
   const submitSearch = (event: FormEvent) => {
     event.preventDefault();
-    void navigate(`/search${search.trim() ? `?q=${encodeURIComponent(search.trim())}` : ''}`);
+    showSearchResults(searchValue);
   };
   let host = session.profile.serverUrl;
   try {
@@ -41,37 +83,23 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
       <div className="app-shell">
         <aside className="sidebar">
           <div className="app-brand">
-            <span aria-hidden="true">♪</span>
+            <span aria-hidden="true">
+              <BrandMark />
+            </span>
             <div>
               <strong>Pocket Player</strong>
               <small>A Navidrome Revolution</small>
             </div>
           </div>
-          <form className="global-search" role="search" onSubmit={submitSearch}>
-            <label htmlFor="global-search-input" className="sr-only">
-              Search your library
-            </label>
-            <input
-              id="global-search-input"
-              type="search"
-              value={search}
-              placeholder="Search your library…"
-              onChange={(event) => setSearch(event.target.value)}
-            />
-          </form>
           <nav aria-label="Main navigation">
-            <NavLink to="/home">Home</NavLink>
-            <NavLink to="/albums">Albums</NavLink>
-            <NavLink to="/artists">Artists</NavLink>
-            <NavLink to="/tracks">Tracks</NavLink>
-            <NavLink to="/genres">Genres</NavLink>
-            <NavLink to="/tags">Tags</NavLink>
-            <NavLink to="/playlists">Playlists</NavLink>
-            <NavLink to="/queue">Queue</NavLink>
-            <NavLink to="/now-playing">Now Playing</NavLink>
-            <NavLink to="/statistics">Statistics</NavLink>
-            <NavLink to="/mix">Track Mix</NavLink>
-            <NavLink to="/settings">Settings</NavLink>
+            {NAV_ITEMS.map((item) => (
+              <NavLink key={item.to} to={item.to} aria-label={item.label} title={item.label}>
+                <span className="nav-glyph" aria-hidden="true">
+                  {item.glyph}
+                </span>
+                <span className="nav-label">{item.label}</span>
+              </NavLink>
+            ))}
           </nav>
           <div className="connection-indicator">
             <span aria-hidden="true" />
@@ -82,6 +110,50 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
           </div>
         </aside>
         <div className="route-content">
+          <header className="workspace-header">
+            <div className="workspace-context" aria-hidden="true">
+              <span>Library</span>
+              <strong>{routeTitle(location.pathname)}</strong>
+            </div>
+            <form className="global-search" role="search" onSubmit={submitSearch}>
+              <label htmlFor="global-search-input" className="sr-only">
+                Search artists, albums, and tracks
+              </label>
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="6.5" />
+                <path d="m16 16 4 4" />
+              </svg>
+              <input
+                ref={searchInput}
+                id="global-search-input"
+                type="search"
+                value={searchValue}
+                placeholder="Search artists, albums, tracks…"
+                aria-keyshortcuts="Control+K Meta+K /"
+                onChange={(event) => {
+                  const next = event.target.value;
+                  setSearch(next);
+                  showSearchResults(next);
+                }}
+              />
+              {searchValue ? (
+                <button
+                  type="button"
+                  className="search-clear"
+                  aria-label="Clear search"
+                  onClick={() => {
+                    setSearch('');
+                    if (location.pathname === '/search') showSearchResults('', true);
+                    searchInput.current?.focus();
+                  }}
+                >
+                  <span aria-hidden="true">×</span>
+                </button>
+              ) : (
+                <kbd>Ctrl K</kbd>
+              )}
+            </form>
+          </header>
           <Routes>
             <Route path="/home" element={<HomePage session={session} />} />
             <Route path="/search" element={<SearchPage session={session} />} />
@@ -110,4 +182,28 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
       </div>
     </PlayerProvider>
   );
+}
+
+function routeTitle(pathname: string): string {
+  if (pathname.startsWith('/albums/')) return 'Album';
+  if (pathname.startsWith('/artists/')) return 'Artist';
+  if (pathname.startsWith('/genres/')) return 'Genre';
+  if (pathname.startsWith('/tags/')) return 'Tag';
+  if (pathname.startsWith('/playlists/')) return 'Playlist';
+  const titles: Record<string, string> = {
+    '/home': 'Home',
+    '/search': 'Search',
+    '/albums': 'Albums',
+    '/artists': 'Artists',
+    '/tracks': 'Tracks',
+    '/genres': 'Genres',
+    '/tags': 'Tags',
+    '/playlists': 'Playlists',
+    '/queue': 'Queue',
+    '/now-playing': 'Now Playing',
+    '/statistics': 'Statistics',
+    '/mix': 'Track Mix',
+    '/settings': 'Settings',
+  };
+  return titles[pathname] ?? 'Home';
 }

@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react';
 
+import { BrandMark } from '../../components/BrandMark';
 import { login } from '../../lib/tauri/auth';
 import { AppError, Profile } from '../../lib/tauri/types';
 
@@ -75,7 +76,7 @@ export function LoginScreen({
     <main className="login-layout">
       <section className="login-card" aria-labelledby="login-title">
         <div className="brand-mark" aria-hidden="true">
-          ♪
+          <BrandMark />
         </div>
         <p className="eyebrow">Pocket Player</p>
         <h1 id="login-title">A Navidrome Revolution</h1>
