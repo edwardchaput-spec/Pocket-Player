@@ -125,6 +125,7 @@ describe('desktop playback controls', () => {
       duration: 90,
       volume: 0.6,
       muted: false,
+      shuffleMode: true,
       queueLength: 1,
       currentIndex: 0,
     };

@@ -40,7 +40,7 @@ vi.mock('../lib/tauri/desktop', () => ({
 beforeEach(() => {
   vi.mocked(getNewestAlbums).mockResolvedValue([]);
   vi.mocked(searchLibrary).mockResolvedValue({ artists: [], albums: [], songs: [] });
-  usePlaybackStore.getState().clear();
+  usePlaybackStore.setState(usePlaybackStore.getInitialState(), true);
   usePlaybackStore.getState().replaceAndPlay(songsFixture, 0);
 });
 
@@ -89,16 +89,39 @@ it('keeps the persistent player mounted across route navigation', async () => {
   expect(screen.getByTestId('persistent-player')).toBe(player);
 });
 
+it('exposes the shared shuffle toggle as an icon in the playback bar', async () => {
+  renderShell('/home');
+
+  const shuffle = screen.getByRole('button', { name: 'Enable shuffle' });
+  expect(shuffle).toHaveAttribute('aria-pressed', 'false');
+  expect(shuffle).toHaveAttribute('title', 'Enable shuffle');
+  expect(shuffle.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+
+  await userEvent.click(shuffle);
+
+  expect(screen.getByRole('button', { name: 'Disable shuffle' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+});
+
 it('opens the interactive queue above the player without replacing the current page', async () => {
   const { container } = renderShell('/home');
 
-  await userEvent.click(screen.getByRole('button', { name: 'Open queue with 3 items' }));
+  const queueTrigger = screen.getByRole('button', {
+    name: /^Open queue with 3 items\. Now playing /,
+  });
+  expect(queueTrigger).toHaveAttribute('aria-controls', 'player-queue-popover');
+  expect(queueTrigger).toHaveAttribute('title', 'Open queue');
+  expect(queueTrigger.querySelector('.queue-link__copy')).toBeNull();
+  expect(queueTrigger.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+
+  await userEvent.click(queueTrigger);
 
   expect(screen.getByRole('region', { name: 'Queue' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Close queue with 3 items' })).toHaveAttribute(
-    'aria-expanded',
-    'true',
-  );
+  expect(
+    screen.getByRole('button', { name: /^Close queue with 3 items\. Now playing / }),
+  ).toHaveAttribute('aria-expanded', 'true');
   expect(container.querySelector('.queue-page')).toBeNull();
   expect(
     screen.getByRole('searchbox', { name: 'Search artists, albums, and tracks' }),
@@ -106,17 +129,18 @@ it('opens the interactive queue above the player without replacing the current p
 
   await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
   act(() => usePlaybackStore.getState().replaceAndPlay(songsFixture, 0));
-  expect(await screen.findByRole('button', { name: 'Open queue with 3 items' })).toHaveAttribute(
-    'aria-expanded',
-    'false',
-  );
+  expect(
+    await screen.findByRole('button', { name: /^Open queue with 3 items\. Now playing / }),
+  ).toHaveAttribute('aria-expanded', 'false');
   expect(screen.queryByRole('region', { name: 'Queue' })).not.toBeInTheDocument();
 });
 
 it('resets the queue popover after removing the final item', async () => {
   usePlaybackStore.getState().replaceAndPlay([songsFixture[0]!], 0);
   renderShell('/home');
-  await userEvent.click(screen.getByRole('button', { name: 'Open queue with 1 item' }));
+  await userEvent.click(
+    screen.getByRole('button', { name: /^Open queue with 1 item\. Now playing / }),
+  );
 
   await userEvent.click(
     screen.getByRole('button', { name: `Remove ${songsFixture[0]!.title} from queue` }),
@@ -124,10 +148,9 @@ it('resets the queue popover after removing the final item', async () => {
   expect(screen.queryByTestId('persistent-player')).not.toBeInTheDocument();
 
   act(() => usePlaybackStore.getState().replaceAndPlay(songsFixture, 0));
-  expect(await screen.findByRole('button', { name: 'Open queue with 3 items' })).toHaveAttribute(
-    'aria-expanded',
-    'false',
-  );
+  expect(
+    await screen.findByRole('button', { name: /^Open queue with 3 items\. Now playing / }),
+  ).toHaveAttribute('aria-expanded', 'false');
   expect(screen.queryByRole('region', { name: 'Queue' })).not.toBeInTheDocument();
 });
 

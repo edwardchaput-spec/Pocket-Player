@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Session } from '../../lib/tauri/types';
 import { showTrackNotification } from '../../lib/tauri/desktop';
+import { saveQueueSnapshot } from '../../lib/tauri/playback';
 import { sessionFixture, songsFixture } from '../../test/fixtures';
 import { PlayerProvider } from './PlayerProvider';
 import { usePlaybackStore } from './playbackStore';
@@ -48,7 +49,7 @@ const loadSpy = vi.spyOn(HTMLMediaElement.prototype, 'load');
 beforeEach(() => {
   vi.clearAllMocks();
   desktopMocks.controlListeners.length = 0;
-  usePlaybackStore.getState().clear();
+  usePlaybackStore.setState(usePlaybackStore.getInitialState(), true);
 });
 
 describe('PlayerProvider startup playback', () => {
@@ -58,6 +59,7 @@ describe('PlayerProvider startup playback', () => {
       ...sessionFixture,
       queueSnapshot: {
         ...queue,
+        unshuffledOccurrenceIds: null,
         position: 42,
         repeatMode: 'off',
         shuffleMode: false,
@@ -92,6 +94,28 @@ describe('PlayerProvider startup playback', () => {
 
     await waitFor(() => expect(playSpy).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(showTrackNotification).toHaveBeenCalledTimes(1));
+  });
+
+  it('persists the canonical queue order while shuffle is active', async () => {
+    usePlaybackStore.getState().replaceAndPlay(songsFixture, 0);
+    renderPlayer(sessionFixture);
+
+    act(() => usePlaybackStore.getState().toggleShuffle());
+
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(saveQueueSnapshot)
+          .mock.calls.some(
+            ([snapshot]) => snapshot.shuffleMode && snapshot.unshuffledOccurrenceIds !== null,
+          ),
+      ).toBe(true),
+    );
+    const snapshots = vi.mocked(saveQueueSnapshot).mock.calls.map(([snapshot]) => snapshot);
+    const shuffledSnapshot = [...snapshots].reverse().find((snapshot) => snapshot.shuffleMode);
+    expect(shuffledSnapshot?.unshuffledOccurrenceIds).toEqual(
+      usePlaybackStore.getState().unshuffledQueue?.map((item) => item.occurrenceId),
+    );
   });
 
   it('reloads the same occurrence for repeat-one with a fresh playback session', async () => {
@@ -143,6 +167,8 @@ describe('PlayerProvider startup playback', () => {
     act(() => listener({ action: 'volume', value: 0.45 }));
     act(() => listener({ action: 'mute', muted: true }));
     expect(usePlaybackStore.getState()).toMatchObject({ volume: 0.45, muted: true });
+    act(() => listener({ action: 'toggle-shuffle' }));
+    expect(usePlaybackStore.getState().shuffleMode).toBe(true);
     await waitFor(() => {
       expect(audio.volume).toBe(0.45);
       expect(audio.muted).toBe(true);
@@ -158,6 +184,7 @@ describe('PlayerProvider startup playback', () => {
           position: 65,
           volume: 0.45,
           muted: true,
+          shuffleMode: true,
           currentIndex: 1,
         }),
       ),

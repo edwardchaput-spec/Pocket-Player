@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 
-import { HomeSection, PlayerSettings, QueueSnapshot, Song } from '../../lib/tauri/types';
+import {
+  DEFAULT_DETAILED_TRACK_COLUMNS,
+  DEFAULT_STANDARD_TRACK_COLUMNS,
+  HomeSection,
+  PlayerSettings,
+  QueueSnapshot,
+  Song,
+  TrackTableColumnId,
+} from '../../lib/tauri/types';
 import {
   appendQueue,
   insertNext,
@@ -10,7 +18,9 @@ import {
   QueueItem,
   removeQueueItem,
   replaceQueue,
+  shuffledReplacementQueue,
   shuffledQueue,
+  shuffleUpcoming,
 } from './queue';
 
 export type PlaybackStatus =
@@ -38,11 +48,13 @@ interface PlaybackState {
   closeToTray: boolean;
   homeSections: HomeSection[];
   pinnedPlaylistIds: string[];
+  trackTableColumns: PlayerSettings['trackTableColumns'];
   error: string | null;
   repeatMode: 'off' | 'queue' | 'one';
   shuffleMode: boolean;
   unshuffledQueue: QueueItem[] | null;
   replaceAndPlay: (tracks: Song[], startIndex?: number) => void;
+  shuffleAndPlay: (tracks: Song[]) => void;
   playNext: (tracks: Song[]) => void;
   append: (tracks: Song[]) => void;
   next: (reason?: 'manual' | 'ended') => void;
@@ -72,6 +84,10 @@ interface PlaybackState {
   setCloseToTray: (enabled: boolean) => void;
   setHomeSections: (sections: HomeSection[]) => void;
   setPinnedPlaylistIds: (ids: string[]) => void;
+  setTrackTableColumns: (
+    preset: keyof PlayerSettings['trackTableColumns'],
+    columns: TrackTableColumnId[],
+  ) => void;
   setError: (message: string | null) => void;
   initializeSettings: (settings: PlayerSettings) => void;
   hydrateQueue: (snapshot: QueueSnapshot) => void;
@@ -108,12 +124,31 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
     'pinnedPlaylists',
   ],
   pinnedPlaylistIds: [],
+  trackTableColumns: {
+    standard: [...DEFAULT_STANDARD_TRACK_COLUMNS],
+    detailed: [...DEFAULT_DETAILED_TRACK_COLUMNS],
+  },
   error: null,
   repeatMode: 'off',
   shuffleMode: false,
   unshuffledQueue: null,
-  replaceAndPlay: (tracks, startIndex = 0) => {
-    const replacement = replaceQueue(tracks, startIndex);
+  replaceAndPlay: (tracks, startIndex) => {
+    const state = get();
+    const replacement = replaceQueue(tracks, startIndex ?? 0);
+    if (state.shuffleMode) {
+      const shuffled =
+        startIndex == null ? shuffledReplacementQueue(replacement) : shuffledQueue(replacement);
+      set({
+        queue: shuffled.items,
+        currentIndex: shuffled.currentIndex,
+        status: shuffled.currentIndex == null ? 'idle' : 'loading',
+        position: 0,
+        duration: 0,
+        error: null,
+        unshuffledQueue: replacement.items.length ? replacement.items : null,
+      });
+      return;
+    }
     set({
       queue: replacement.items,
       currentIndex: replacement.currentIndex,
@@ -123,6 +158,20 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
       error: null,
       unshuffledQueue: null,
       shuffleMode: false,
+    });
+  },
+  shuffleAndPlay: (tracks) => {
+    const replacement = replaceQueue(tracks);
+    const shuffled = shuffledReplacementQueue(replacement);
+    set({
+      queue: shuffled.items,
+      currentIndex: shuffled.currentIndex,
+      status: shuffled.currentIndex == null ? 'idle' : 'loading',
+      position: 0,
+      duration: 0,
+      error: null,
+      shuffleMode: true,
+      unshuffledQueue: replacement.items.length ? replacement.items : null,
     });
   },
   playNext: (tracks) => {
@@ -136,15 +185,21 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
     });
   },
   append: (tracks) => {
+    if (tracks.length === 0) return;
     const state = get();
     const next = appendQueue({ items: state.queue, currentIndex: state.currentIndex }, tracks);
     const additions = next.items.slice(state.queue.length);
+    const visible = state.shuffleMode
+      ? state.currentIndex == null
+        ? shuffledReplacementQueue(next)
+        : shuffleUpcoming(next)
+      : next;
     set({
-      queue: next.items,
-      currentIndex: next.currentIndex,
-      status: state.currentIndex == null && next.currentIndex != null ? 'loading' : state.status,
-      unshuffledQueue: state.unshuffledQueue
-        ? [...state.unshuffledQueue, ...additions]
+      queue: visible.items,
+      currentIndex: visible.currentIndex,
+      status: state.currentIndex == null && visible.currentIndex != null ? 'loading' : state.status,
+      unshuffledQueue: state.shuffleMode
+        ? [...(state.unshuffledQueue ?? state.queue), ...additions]
         : state.unshuffledQueue,
     });
   },
@@ -224,7 +279,7 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
           : current?.occurrenceId !== nextCurrent?.occurrenceId
             ? 'loading'
             : state.status,
-      shuffleMode: queue.length === 0 ? false : state.shuffleMode,
+      shuffleMode: state.shuffleMode,
       unshuffledQueue: queue.length === 0 ? null : unshuffledQueue,
     });
   },
@@ -246,20 +301,23 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   toggleShuffle: () => {
     const state = get();
     if (state.shuffleMode) {
-      const currentId =
-        state.currentIndex == null ? undefined : state.queue[state.currentIndex]?.occurrenceId;
-      const queue = state.unshuffledQueue ?? state.queue;
+      const played = state.currentIndex == null ? [] : state.queue.slice(0, state.currentIndex + 1);
+      const playedIds = new Set(played.map((item) => item.occurrenceId));
+      const queue = [
+        ...played,
+        ...(state.unshuffledQueue ?? state.queue).filter(
+          (item) => !playedIds.has(item.occurrenceId),
+        ),
+      ];
       set({
         queue,
-        currentIndex: currentId
-          ? queue.findIndex((item) => item.occurrenceId === currentId)
-          : state.currentIndex,
+        currentIndex: state.currentIndex,
         shuffleMode: false,
         unshuffledQueue: null,
       });
       return;
     }
-    const shuffled = shuffledQueue({ items: state.queue, currentIndex: state.currentIndex });
+    const shuffled = shuffleUpcoming({ items: state.queue, currentIndex: state.currentIndex });
     set({
       queue: shuffled.items,
       currentIndex: shuffled.currentIndex,
@@ -275,7 +333,6 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
       position: 0,
       duration: 0,
       error: null,
-      shuffleMode: false,
       unshuffledQueue: null,
     }),
   setStatus: (status) => set({ status }),
@@ -310,6 +367,15 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   setCloseToTray: (closeToTray) => set({ closeToTray }),
   setHomeSections: (homeSections) => set({ homeSections }),
   setPinnedPlaylistIds: (pinnedPlaylistIds) => set({ pinnedPlaylistIds }),
+  setTrackTableColumns: (preset, columns) => {
+    const unique = [...new Set(columns.filter((column) => column !== 'title'))];
+    set((state) => ({
+      trackTableColumns: {
+        ...state.trackTableColumns,
+        [preset]: ['title', ...unique],
+      },
+    }));
+  },
   setError: (error) => set({ error, status: error ? 'error' : get().status }),
   initializeSettings: (settings) => set(settings),
   hydrateQueue: (snapshot) =>
@@ -324,7 +390,7 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
       status: snapshot.currentIndex == null ? 'idle' : 'paused',
       repeatMode: snapshot.repeatMode,
       shuffleMode: snapshot.shuffleMode,
-      unshuffledQueue: null,
+      unshuffledQueue: restoreUnshuffledQueue(snapshot),
       error: null,
     }),
 }));
@@ -350,4 +416,16 @@ function mirrorPlaybackSession(original: QueueItem[] | null, renewed: QueueItem 
       ? { ...item, playbackSessionId: renewed.playbackSessionId }
       : item,
   );
+}
+
+function restoreUnshuffledQueue(snapshot: QueueSnapshot): QueueItem[] | null {
+  if (!snapshot.shuffleMode || !snapshot.unshuffledOccurrenceIds) return null;
+  const visibleByOccurrence = new Map(snapshot.items.map((item) => [item.occurrenceId, item]));
+  const restored = snapshot.unshuffledOccurrenceIds.flatMap((occurrenceId) => {
+    const item = visibleByOccurrence.get(occurrenceId);
+    return item ? [item] : [];
+  });
+  return restored.length === snapshot.items.length && new Set(restored).size === restored.length
+    ? restored
+    : null;
 }

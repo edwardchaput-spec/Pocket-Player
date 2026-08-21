@@ -49,6 +49,70 @@ export const customThemeColorsSchema = z.object({
 });
 export type CustomThemeColors = z.infer<typeof customThemeColorsSchema>;
 
+export const TRACK_TABLE_COLUMN_IDS = [
+  'title',
+  'artist',
+  'album',
+  'displayAlbumArtist',
+  'track',
+  'discNumber',
+  'year',
+  'genres',
+  'moods',
+  'tags',
+  'duration',
+  'playCount',
+  'rating',
+  'averageRating',
+  'starred',
+  'bpm',
+  'format',
+  'suffix',
+  'contentType',
+  'bitRate',
+  'bitDepth',
+  'samplingRate',
+  'channelCount',
+  'size',
+  'created',
+  'comment',
+  'sortName',
+  'musicBrainzId',
+] as const;
+export type TrackTableColumnId = (typeof TRACK_TABLE_COLUMN_IDS)[number];
+
+export const DEFAULT_STANDARD_TRACK_COLUMNS: TrackTableColumnId[] = [
+  'title',
+  'artist',
+  'album',
+  'duration',
+];
+export const DEFAULT_DETAILED_TRACK_COLUMNS: TrackTableColumnId[] = [
+  'title',
+  'artist',
+  'album',
+  'tags',
+  'duration',
+  'playCount',
+  'rating',
+  'format',
+  'bitRate',
+  'size',
+];
+
+const trackTableColumnListSchema = z
+  .array(z.enum(TRACK_TABLE_COLUMN_IDS))
+  .min(1)
+  .max(TRACK_TABLE_COLUMN_IDS.length)
+  .refine((columns) => columns.includes('title'), 'The title column is required.')
+  .refine((columns) => new Set(columns).size === columns.length, 'Columns must be unique.');
+
+export const trackTableColumnsSchema = z.object({
+  standard: trackTableColumnListSchema,
+  detailed: trackTableColumnListSchema,
+});
+export type TrackTableColumns = z.infer<typeof trackTableColumnsSchema>;
+
 export const playerSettingsSchema = z.object({
   volume: z.number().min(0).max(1),
   muted: z.boolean(),
@@ -79,6 +143,7 @@ export const playerSettingsSchema = z.object({
     )
     .max(8),
   pinnedPlaylistIds: z.array(z.string()).max(100),
+  trackTableColumns: trackTableColumnsSchema,
 });
 export type PlayerSettings = z.infer<typeof playerSettingsSchema>;
 export type HomeSection = PlayerSettings['homeSections'][number];
@@ -249,6 +314,7 @@ export const queueItemSchema = z.object({
 
 export const queueSnapshotSchema = z.object({
   items: z.array(queueItemSchema).max(10_000),
+  unshuffledOccurrenceIds: z.array(z.string().min(1).max(100)).max(10_000).nullable().default(null),
   currentIndex: z.number().int().nonnegative().nullable(),
   position: z.number().nonnegative(),
   repeatMode: z.enum(['off', 'queue', 'one']),

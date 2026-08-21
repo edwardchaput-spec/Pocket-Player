@@ -1,5 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
+use futures_util::{StreamExt, TryStreamExt, stream};
 use reqwest::{Response, StatusCode, redirect};
 use serde_json::Value;
 use url::Url;
@@ -14,9 +15,11 @@ use super::{
     auth::{CLIENT_ID, PROTOCOL_VERSION, fresh_salt, token_for},
     models::{
         AlbumDetail, AlbumSummary, ArtistDetail, ArtistSummary, Extension, Genre, LyricsList,
-        PlaylistDetail, PlaylistSummary, SearchResults,
+        PlaylistDetail, PlaylistSummary, SearchResults, Song,
     },
 };
+
+const ARTIST_ALBUM_FETCH_CONCURRENCY: usize = 4;
 
 #[derive(Clone)]
 pub struct NavidromeClient {
@@ -231,6 +234,23 @@ impl NavidromeClient {
             .await?;
         serde_json::from_value(require_payload(&root, "artist")?.clone())
             .map_err(|_| malformed("The server returned malformed artist details."))
+    }
+
+    pub async fn get_artist_songs(&self, artist_id: &str) -> AppResult<Vec<Song>> {
+        let artist = self.get_artist(artist_id).await?;
+        let albums: Vec<AlbumDetail> =
+            stream::iter(artist.albums.into_iter().map(|album| album.id))
+                .map(|album_id| async move { self.get_album(&album_id).await })
+                .buffered(ARTIST_ALBUM_FETCH_CONCURRENCY)
+                .try_collect()
+                .await?;
+
+        let mut songs = Vec::new();
+        for mut album in albums {
+            order_album_songs(&mut album.songs);
+            songs.extend(album.songs);
+        }
+        Ok(songs)
     }
 
     pub async fn get_genres(&self) -> AppResult<Vec<Genre>> {
@@ -524,6 +544,20 @@ fn validate_id(id: &str) -> AppResult<()> {
     } else {
         Ok(())
     }
+}
+
+fn order_album_songs(songs: &mut [Song]) {
+    songs.sort_by(|left, right| {
+        left.disc_number
+            .unwrap_or(1)
+            .cmp(&right.disc_number.unwrap_or(1))
+            .then_with(|| {
+                left.track
+                    .unwrap_or(u32::MAX)
+                    .cmp(&right.track.unwrap_or(u32::MAX))
+            })
+            .then_with(|| left.title.cmp(&right.title))
+    });
 }
 
 fn parse_envelope(value: Value) -> AppResult<Value> {

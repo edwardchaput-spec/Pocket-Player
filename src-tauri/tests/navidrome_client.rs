@@ -128,6 +128,151 @@ async fn album_detail_includes_opaque_track_ids() {
 }
 
 #[tokio::test]
+async fn artist_songs_preserve_album_order_and_sort_tracks_with_bounded_fan_out() {
+    let server = MockServer::start_async().await;
+    let artist = server
+        .mock_async(|when, then| {
+            when.method(GET)
+                .path("/rest/getArtist.view")
+                .query_param("id", "artist/string-id");
+            then.status(200).json_body(json!({
+                "subsonic-response": {
+                    "status": "ok",
+                    "artist": {
+                        "id": "artist/string-id",
+                        "name": "Artist",
+                        "album": [
+                            {"id": "album:later-response", "name": "First album"},
+                            {"id": "album:earlier-response", "name": "Second album"}
+                        ]
+                    }
+                }
+            }));
+        })
+        .await;
+    let first_album = server
+        .mock_async(|when, then| {
+            when.method(GET)
+                .path("/rest/getAlbum.view")
+                .query_param("id", "album:later-response");
+            then.status(200)
+                .delay(Duration::from_millis(50))
+                .json_body(json!({
+                    "subsonic-response": {
+                        "status": "ok",
+                        "album": {
+                            "id": "album:later-response",
+                            "name": "First album",
+                            "song": [
+                                {"id": "first:disc-two", "title": "Disc two", "discNumber": 2, "track": 1},
+                                {"id": "first:track-two", "title": "Track two", "discNumber": 1, "track": 2},
+                                {"id": "first:track-one", "title": "Track one", "discNumber": 1, "track": 1}
+                            ]
+                        }
+                    }
+                }));
+        })
+        .await;
+    let second_album = server
+        .mock_async(|when, then| {
+            when.method(GET)
+                .path("/rest/getAlbum.view")
+                .query_param("id", "album:earlier-response");
+            then.status(200).json_body(json!({
+                "subsonic-response": {
+                    "status": "ok",
+                    "album": {
+                        "id": "album:earlier-response",
+                        "name": "Second album",
+                        "song": [
+                            {"id": "second:track", "title": "Second album track", "track": 1}
+                        ]
+                    }
+                }
+            }));
+        })
+        .await;
+
+    let songs = client(&server)
+        .get_artist_songs("artist/string-id")
+        .await
+        .expect("artist songs");
+
+    assert_eq!(
+        songs
+            .iter()
+            .map(|song| song.id.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "first:track-one",
+            "first:track-two",
+            "first:disc-two",
+            "second:track"
+        ]
+    );
+    artist.assert_calls_async(1).await;
+    first_album.assert_calls_async(1).await;
+    second_album.assert_calls_async(1).await;
+}
+
+#[tokio::test]
+async fn artist_songs_fail_without_returning_a_partial_collection() {
+    let server = MockServer::start_async().await;
+    server
+        .mock_async(|when, then| {
+            when.method(GET)
+                .path("/rest/getArtist.view")
+                .query_param("id", "artist:partial");
+            then.status(200).json_body(json!({
+                "subsonic-response": {
+                    "status": "ok",
+                    "artist": {
+                        "id": "artist:partial",
+                        "name": "Artist",
+                        "album": [
+                            {"id": "album:available", "name": "Available"},
+                            {"id": "album:missing", "name": "Missing"}
+                        ]
+                    }
+                }
+            }));
+        })
+        .await;
+    server
+        .mock_async(|when, then| {
+            when.method(GET)
+                .path("/rest/getAlbum.view")
+                .query_param("id", "album:available");
+            then.status(200).json_body(json!({
+                "subsonic-response": {
+                    "status": "ok",
+                    "album": {
+                        "id": "album:available",
+                        "name": "Available",
+                        "song": [{"id": "song:available", "title": "Available"}]
+                    }
+                }
+            }));
+        })
+        .await;
+    server
+        .mock_async(|when, then| {
+            when.method(GET)
+                .path("/rest/getAlbum.view")
+                .query_param("id", "album:missing");
+            then.status(404);
+        })
+        .await;
+
+    let error = client(&server)
+        .get_artist_songs("artist:partial")
+        .await
+        .expect_err("a partial artist collection must fail");
+
+    assert_eq!(error.code, "NOT_FOUND");
+}
+
+#[tokio::test]
 async fn search_preserves_rich_track_tags_for_indexing_and_sorting() {
     let server = MockServer::start_async().await;
     let mock = server

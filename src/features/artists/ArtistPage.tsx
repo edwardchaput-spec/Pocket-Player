@@ -1,11 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useParams } from 'react-router-dom';
 
 import { AlbumGrid } from '../../components/AlbumGrid';
 import { EmptyState, ErrorState } from '../../components/AsyncState';
 import { FavoriteButton, RatingControl } from '../../components/LibraryActions';
-import { getArtist } from '../../lib/tauri/library';
+import { getArtist, getArtistSongs } from '../../lib/tauri/library';
 import { Session } from '../../lib/tauri/types';
+import { usePlaybackStore } from '../player/playbackStore';
+
+type ArtistPlaybackAction = 'play' | 'shuffle';
+interface ArtistPlaybackRequest {
+  action: ArtistPlaybackAction;
+  artistId: string;
+}
 
 export function ArtistPage({ session }: { session: Session }) {
   const { artistId = '' } = useParams();
@@ -13,6 +20,16 @@ export function ArtistPage({ session }: { session: Session }) {
     queryKey: ['profile', session.profile.profileId, 'artist', artistId],
     queryFn: () => getArtist(artistId),
     enabled: Boolean(artistId),
+  });
+  const playback = usePlaybackStore();
+  const loadSongs = useMutation({
+    mutationFn: ({ artistId: requestedArtistId }: ArtistPlaybackRequest) =>
+      getArtistSongs(requestedArtistId),
+    onSuccess: (songs, request) => {
+      if (songs.length === 0) return;
+      if (request.action === 'shuffle') playback.shuffleAndPlay(songs);
+      else playback.replaceAndPlay(songs);
+    },
   });
   if (!artistId)
     return <EmptyState title="Artist not found" detail="The artist address is invalid." />;
@@ -38,6 +55,26 @@ export function ArtistPage({ session }: { session: Session }) {
           <p className="muted">{artist.albumCount ?? artist.albums.length} albums</p>
         </div>
         <div className="button-row">
+          <button
+            className="primary-button"
+            type="button"
+            disabled={artist.albums.length === 0 || loadSongs.isPending}
+            onClick={() => loadSongs.mutate({ action: 'play', artistId })}
+          >
+            {loadSongs.isPending && loadSongs.variables.action === 'play'
+              ? 'Loading tracks…'
+              : '▶ Play all'}
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
+            disabled={artist.albums.length === 0 || loadSongs.isPending}
+            onClick={() => loadSongs.mutate({ action: 'shuffle', artistId })}
+          >
+            {loadSongs.isPending && loadSongs.variables.action === 'shuffle'
+              ? 'Loading tracks…'
+              : 'Shuffle all'}
+          </button>
           <FavoriteButton
             id={artist.id}
             itemType="artist"
@@ -47,6 +84,16 @@ export function ArtistPage({ session }: { session: Session }) {
           <RatingControl id={artist.id} value={artist.userRating} />
         </div>
       </header>
+      {loadSongs.isError && (
+        <p className="message error-message" role="alert">
+          Could not load every track for {artist.name}. {loadSongs.error.message}
+        </p>
+      )}
+      {loadSongs.isSuccess && loadSongs.data.length === 0 && (
+        <p className="message" role="status">
+          Navidrome returned no playable tracks for {artist.name}.
+        </p>
+      )}
       {artist.albums.length ? (
         <AlbumGrid albums={artist.albums} proxyBaseUrl={session.proxyBaseUrl} />
       ) : (

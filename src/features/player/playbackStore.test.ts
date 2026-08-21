@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { songsFixture } from '../../test/fixtures';
 import { replaceQueue } from './queue';
@@ -53,20 +53,94 @@ describe('playback store queue sessions', () => {
     expect(usePlaybackStore.getState().queue.map((item) => item.occurrenceId)).toEqual(reordered);
   });
 
-  it('turns off a restored shuffle state without reshuffling the canonical snapshot', () => {
-    const snapshot = replaceQueue(songsFixture, 1);
+  it('restores the persisted unseen canonical order when shuffle is disabled', () => {
+    const canonical = replaceQueue(songsFixture, 0);
+    const visible = {
+      items: [canonical.items[0]!, canonical.items[2]!, canonical.items[1]!],
+      currentIndex: 0,
+    };
     usePlaybackStore.getState().hydrateQueue({
-      ...snapshot,
+      ...visible,
+      unshuffledOccurrenceIds: canonical.items.map((item) => item.occurrenceId),
       position: 12,
       repeatMode: 'off',
       shuffleMode: true,
     });
-    const order = snapshot.items.map((item) => item.occurrenceId);
 
     usePlaybackStore.getState().toggleShuffle();
 
     expect(usePlaybackStore.getState().shuffleMode).toBe(false);
-    expect(usePlaybackStore.getState().queue.map((item) => item.occurrenceId)).toEqual(order);
+    expect(usePlaybackStore.getState().queue.map((item) => item.occurrenceId)).toEqual(
+      canonical.items.map((item) => item.occurrenceId),
+    );
+  });
+
+  it('keeps shuffle enabled when replacing a queue from another library view', () => {
+    usePlaybackStore.getState().replaceAndPlay(songsFixture, 0);
+    usePlaybackStore.getState().toggleShuffle();
+
+    usePlaybackStore.getState().replaceAndPlay([...songsFixture].reverse(), 1);
+
+    const playback = usePlaybackStore.getState();
+    expect(playback.shuffleMode).toBe(true);
+    expect(playback.currentIndex).toBe(0);
+    expect(playback.queue[0]?.track.id).toBe(songsFixture[1]?.id);
+    expect(playback.unshuffledQueue?.map((item) => item.track.id)).toEqual(
+      [...songsFixture].reverse().map((track) => track.id),
+    );
+  });
+
+  it('starts a shuffled queue explicitly and keeps the preference after clearing it', () => {
+    usePlaybackStore.getState().shuffleAndPlay(songsFixture);
+    expect(usePlaybackStore.getState().shuffleMode).toBe(true);
+
+    usePlaybackStore.getState().clear();
+    expect(usePlaybackStore.getState()).toMatchObject({
+      queue: [],
+      currentIndex: null,
+      shuffleMode: true,
+    });
+  });
+
+  it('shuffles tracks appended to an active queue while preserving canonical order', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    usePlaybackStore.getState().replaceAndPlay([songsFixture[0]!], 0);
+    usePlaybackStore.getState().toggleShuffle();
+
+    usePlaybackStore.getState().append([songsFixture[1]!, songsFixture[2]!]);
+
+    const playback = usePlaybackStore.getState();
+    expect(playback.queue.map((item) => item.track.id)).toEqual([
+      songsFixture[0]!.id,
+      songsFixture[2]!.id,
+      songsFixture[1]!.id,
+    ]);
+    expect(playback.unshuffledQueue?.map((item) => item.track.id)).toEqual(
+      songsFixture.map((track) => track.id),
+    );
+    random.mockRestore();
+  });
+
+  it('preserves played history and restores only the unseen canonical tail', () => {
+    usePlaybackStore.getState().replaceAndPlay(songsFixture, 0);
+    const original = usePlaybackStore.getState().queue;
+    usePlaybackStore.setState({ currentIndex: 0 });
+    usePlaybackStore.getState().toggleShuffle();
+    usePlaybackStore.getState().next();
+
+    const shuffledHistory = usePlaybackStore.getState().queue.slice(0, 2);
+    usePlaybackStore.getState().toggleShuffle();
+
+    const playback = usePlaybackStore.getState();
+    expect(playback.queue.slice(0, 2)).toEqual(shuffledHistory);
+    expect(playback.queue.slice(2).map((item) => item.occurrenceId)).toEqual(
+      original
+        .filter(
+          (item) => !shuffledHistory.some((played) => played.occurrenceId === item.occurrenceId),
+        )
+        .map((item) => item.occurrenceId),
+    );
+    expect(playback.currentIndex).toBe(1);
   });
 });
 

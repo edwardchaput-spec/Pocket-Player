@@ -1,3 +1,121 @@
+.track-table-panel {
+  position: relative;
+  min-width: 0;
+}
+
+.track-table-toolbar {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.track-column-picker {
+  position: relative;
+}
+
+.track-column-picker__trigger,
+.track-column-picker__reset {
+  min-height: 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.track-column-picker__trigger {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 12px;
+}
+
+.track-column-picker__trigger:hover,
+.track-column-picker__trigger:focus-visible,
+.track-column-picker__trigger[aria-expanded='true'],
+.track-column-picker__reset:hover,
+.track-column-picker__reset:focus-visible {
+  border-color: color-mix(in srgb, var(--accent), var(--border) 35%);
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.track-column-picker__menu {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 6px);
+  right: 0;
+  width: min(420px, calc(100vw - 40px));
+  max-height: min(560px, 72vh);
+  padding: 14px;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--accent), var(--border) 55%);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  box-shadow: 0 18px 48px #0009;
+}
+
+.track-column-picker__menu fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.track-column-picker__menu legend {
+  margin-bottom: 12px;
+  color: var(--text);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.track-column-picker__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 12px;
+}
+
+.track-column-picker__options label {
+  min-width: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 7px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.track-column-picker__options label:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.track-column-picker__options input {
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
+.track-column-picker__options input:disabled + span {
+  color: color-mix(in srgb, var(--text-muted), transparent 25%);
+}
+
+.track-column-picker__reset {
+  width: 100%;
+  margin-top: 12px;
+  padding-inline: 12px;
+}
+
+.track-table {
+  table-layout: auto;
+}
+
 .track-table .track-sort-button {
   width: 100%;
   display: inline-flex;
@@ -16,6 +134,10 @@
 
 .track-table th.numeric .track-sort-button {
   justify-content: flex-end;
+}
+
+.track-table th.track-static-header.numeric {
+  text-align: right;
 }
 
 .track-table .track-sort-button:hover,
@@ -51,4 +173,62 @@
 .track-table .track-size {
   min-width: 84px;
   font-size: 0.76rem;
+}
+
+.track-table th.track-column-title,
+.track-table td.track-column-title {
+  width: 30%;
+  min-width: 210px;
+  max-width: none;
+}
+
+.track-table th.track-column-artist,
+.track-table td.track-column-artist,
+.track-table th.track-column-album,
+.track-table td.track-column-album,
+.track-table th.track-column-album-artist,
+.track-table td.track-column-album-artist {
+  width: 18%;
+  min-width: 150px;
+  max-width: none;
+}
+
+.track-table .track-cell-link,
+.track-table .track-cell-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-table .track-column-tags {
+  min-width: 180px;
+}
+
+.track-table .track-column-duration,
+.track-table .track-column-track,
+.track-table .track-column-disc,
+.track-table .track-column-year,
+.track-table .track-column-plays,
+.track-table .track-column-average-rating,
+.track-table .track-column-bpm,
+.track-table .track-column-bit-depth,
+.track-table .track-column-sample-rate,
+.track-table .track-column-channels,
+.track-table .track-column-created {
+  white-space: nowrap;
+}
+
+.track-table .track-column-comment,
+.track-table .track-column-sort-name,
+.track-table .track-column-musicbrainz,
+.track-table .track-column-content-type {
+  min-width: 170px;
+}
+
+@media (max-width: 620px) {
+  .track-column-picker__options {
+    grid-template-columns: 1fr;
+  }
 }

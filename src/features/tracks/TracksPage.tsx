@@ -133,6 +133,15 @@ export function TracksPage({ session }: { session: Session }) {
           <h1>Tracks</h1>
         </div>
         <div className="index-summary">
+          {loadedTracks.length > 0 && (
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => playback.shuffleAndPlay(loadedTracks)}
+            >
+              Shuffle loaded tracks
+            </button>
+          )}
           <span>
             {tracks.data?.pages[0]
               ? `${total.toLocaleString()} matches · indexed ${new Date(tracks.data.pages[0].refreshedAt).toLocaleString()}`

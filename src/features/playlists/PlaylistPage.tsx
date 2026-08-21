@@ -108,6 +108,14 @@ function PlaylistContent({ playlist, session }: { playlist: PlaylistDetail; sess
           <button
             className="secondary-button"
             type="button"
+            disabled={!songs.length}
+            onClick={() => playback.shuffleAndPlay(songs)}
+          >
+            Shuffle all
+          </button>
+          <button
+            className="secondary-button"
+            type="button"
             disabled={!name.trim() || !dirty || save.isPending}
             onClick={() => save.mutate()}
           >

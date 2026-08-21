@@ -37,7 +37,7 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
 
   useEffect(() => {
     state.initializeSettings(session.playerSettings);
-    if (state.queue.length === 0 && session.queueSnapshot?.items.length) {
+    if (state.queue.length === 0 && session.queueSnapshot) {
       state.hydrateQueue(session.queueSnapshot);
     }
     // The persisted values are initialization input for the process session.
@@ -131,6 +131,7 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
         closeToTray: state.closeToTray,
         homeSections: state.homeSections,
         pinnedPlaylistIds: state.pinnedPlaylistIds,
+        trackTableColumns: state.trackTableColumns,
       }).catch(() => undefined);
     }, 300);
     return () => window.clearTimeout(timer);
@@ -151,6 +152,7 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
     state.closeToTray,
     state.homeSections,
     state.pinnedPlaylistIds,
+    state.trackTableColumns,
   ]);
 
   useEffect(() => {
@@ -198,6 +200,8 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
         playback.setVolume(control.value);
       } else if (control.action === 'mute' && control.muted != null) {
         playback.setMuted(control.muted);
+      } else if (control.action === 'toggle-shuffle') {
+        playback.toggleShuffle();
       }
       if (control.action === 'mini-ready') void publishPlaybackState(session.proxyBaseUrl);
     })
@@ -222,6 +226,7 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
     state.duration,
     state.volume,
     state.muted,
+    state.shuffleMode,
     state.queue.length,
     state.currentIndex,
   ]);
@@ -494,9 +499,10 @@ function ActivePlayerBar({ audioRef, proxyBaseUrl }: PlayerBarProps) {
             className={state.shuffleMode ? 'is-active' : ''}
             aria-label={state.shuffleMode ? 'Disable shuffle' : 'Enable shuffle'}
             aria-pressed={state.shuffleMode}
+            title={state.shuffleMode ? 'Disable shuffle' : 'Enable shuffle'}
             onClick={() => state.toggleShuffle()}
           >
-            ⇄
+            <PlayerUtilityIcon name="shuffle" />
           </button>
           <button type="button" aria-label="Previous track" onClick={() => state.previous()}>
             ⏮
@@ -548,24 +554,35 @@ function ActivePlayerBar({ audioRef, proxyBaseUrl }: PlayerBarProps) {
         )}
       </div>
       <div className="volume-control">
-        <button type="button" aria-label="Open mini player" onClick={() => void openMiniPlayer()}>
-          Mini
+        <button
+          className="player-utility-button"
+          type="button"
+          aria-label="Open mini player"
+          title="Open mini player"
+          onClick={() => void openMiniPlayer()}
+        >
+          <PlayerUtilityIcon name="mini" />
         </button>
-        <Link className="visualizer-link" to="/now-playing#visualizer" aria-label="Open visualiser">
-          Visualiser
+        <Link
+          className="player-utility-button visualizer-link"
+          to="/now-playing#visualizer"
+          aria-label="Open visualiser"
+          title="Open visualiser"
+        >
+          <PlayerUtilityIcon name="visualizer" />
         </Link>
         <div className="queue-popover-anchor">
           <button
             ref={queueTriggerRef}
-            className="queue-link"
+            className="queue-link player-utility-button"
             type="button"
-            aria-label={`${queueOpen ? 'Close' : 'Open'} queue with ${state.queue.length} ${state.queue.length === 1 ? 'item' : 'items'}`}
+            aria-label={`${queueOpen ? 'Close' : 'Open'} queue with ${state.queue.length} ${state.queue.length === 1 ? 'item' : 'items'}. Now playing ${track.title} at ${formatClock(state.position)}`}
             aria-expanded={queueOpen}
             aria-controls="player-queue-popover"
+            title={queueOpen ? 'Close queue' : 'Open queue'}
             onClick={() => setQueueOpen((open) => !open)}
           >
-            Queue{' '}
-            {state.currentIndex == null ? '' : `${state.currentIndex + 1}/${state.queue.length}`}
+            <PlayerUtilityIcon name="queue" />
           </button>
           {queueOpen && <QueuePopover open onClose={closeQueue} triggerRef={queueTriggerRef} />}
         </div>
@@ -594,6 +611,9 @@ async function persistQueue(syncRemote = false): Promise<void> {
   const state = usePlaybackStore.getState();
   const snapshot = {
     items: state.queue,
+    unshuffledOccurrenceIds: state.shuffleMode
+      ? (state.unshuffledQueue?.map((item) => item.occurrenceId) ?? null)
+      : null,
     currentIndex: state.currentIndex,
     position: state.position,
     repeatMode: state.repeatMode,
@@ -618,6 +638,7 @@ async function publishPlaybackState(proxyBaseUrl: string): Promise<void> {
     duration: state.duration,
     volume: state.volume,
     muted: state.muted,
+    shuffleMode: state.shuffleMode,
     queueLength: state.queue.length,
     currentIndex: state.currentIndex,
   }).catch(() => undefined);
@@ -641,6 +662,37 @@ function pauseAudio(
 
 function isPlaybackActive(status: PlaybackStatus): boolean {
   return status === 'loading' || status === 'playing' || status === 'stalled';
+}
+
+function PlayerUtilityIcon({ name }: { name: 'mini' | 'visualizer' | 'queue' | 'shuffle' }) {
+  if (name === 'shuffle') {
+    return (
+      <svg className="player-utility-icon" aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M4 7h3c4 0 5 10 9 10h4M17 14l3 3-3 3M4 17h3c1.5 0 2.6-1.4 3.7-3.2M14 7h6M17 4l3 3-3 3" />
+      </svg>
+    );
+  }
+  if (name === 'mini') {
+    return (
+      <svg className="player-utility-icon" aria-hidden="true" viewBox="0 0 24 24">
+        <rect x="3.5" y="5" width="17" height="14" rx="2" />
+        <path d="M7 15h6M16 14v2M8 9h8" />
+      </svg>
+    );
+  }
+  if (name === 'visualizer') {
+    return (
+      <svg className="player-utility-icon" aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M4 15V9M8 18V6M12 16V8M16 20V4M20 14v-4" />
+      </svg>
+    );
+  }
+  return (
+    <svg className="player-utility-icon" aria-hidden="true" viewBox="0 0 24 24">
+      <path d="M5 7h11M5 12h11M5 17h8" />
+      <path d="m17 15 3 2-3 2Z" />
+    </svg>
+  );
 }
 
 function formatClock(value: number): string {

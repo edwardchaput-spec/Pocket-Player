@@ -47,6 +47,9 @@ export const getArtists = () => invokeParsed('artists', z.array(artistSummarySch
 export const getArtist = (artistId: string) =>
   invokeParsed('get_artist', artistDetailSchema, { artistId });
 
+export const getArtistSongs = (artistId: string) =>
+  invokeParsed('artist_songs', z.array(songSchema), { artistId });
+
 export const getGenres = () => invokeParsed('genres', z.array(genreSchema));
 
 export const getSongsByGenre = (genre: string, count: number, offset: number) =>

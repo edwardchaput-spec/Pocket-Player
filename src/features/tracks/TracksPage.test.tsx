@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { queryTracks } from '../../lib/tauri/library';
 import { sessionFixture, songsFixture } from '../../test/fixtures';
+import { usePlaybackStore } from '../player/playbackStore';
 import { TracksPage } from './TracksPage';
 
 vi.mock('../../lib/tauri/library', async (importOriginal) => {
@@ -24,7 +25,10 @@ vi.mock('../../lib/tauri/library', async (importOriginal) => {
 });
 
 describe('TracksPage table sorting', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    usePlaybackStore.setState(usePlaybackStore.getInitialState(), true);
+  });
 
   it('queries the complete index with the composite format sort in both directions', async () => {
     const user = userEvent.setup();
@@ -47,6 +51,22 @@ describe('TracksPage table sorting', () => {
       expect(queryTracks).toHaveBeenLastCalledWith(
         expect.objectContaining({ sortBy: 'format', descending: true }),
       ),
+    );
+  });
+
+  it('shuffles the currently loaded result pages', async () => {
+    const user = userEvent.setup();
+    renderTracksPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Shuffle loaded tracks' }));
+
+    const playback = usePlaybackStore.getState();
+    expect(playback.shuffleMode).toBe(true);
+    expect(new Set(playback.queue.map((item) => item.track.id))).toEqual(
+      new Set(songsFixture.map((track) => track.id)),
+    );
+    expect(playback.unshuffledQueue?.map((item) => item.track.id)).toEqual(
+      songsFixture.map((track) => track.id),
     );
   });
 });

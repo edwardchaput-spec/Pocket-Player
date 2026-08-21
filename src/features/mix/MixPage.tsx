@@ -225,14 +225,24 @@ export function MixPage({ session }: { session: Session }) {
                 Seed {mix.data.seed.slice(0, 12)} · {tracks.length} tracks
               </p>
             </div>
-            <button
-              className="primary-button"
-              type="button"
-              disabled={!tracks.length}
-              onClick={() => playback.replaceAndPlay(tracks)}
-            >
-              Play mix
-            </button>
+            <div className="button-row">
+              <button
+                className="primary-button"
+                type="button"
+                disabled={!tracks.length}
+                onClick={() => playback.replaceAndPlay(tracks)}
+              >
+                Play mix
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                disabled={!tracks.length}
+                onClick={() => playback.shuffleAndPlay(tracks)}
+              >
+                Shuffle all
+              </button>
+            </div>
           </header>
           {mix.data.warnings.length > 0 && (
             <ul className="mix-warnings">

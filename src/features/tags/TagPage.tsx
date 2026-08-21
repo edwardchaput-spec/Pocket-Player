@@ -59,13 +59,22 @@ export function TagPage({ session }: { session: Session }) {
           {total > 0 && <p className="muted">{total.toLocaleString()} matching tracks</p>}
         </div>
         {tracks.length > 0 && (
-          <button
-            className="primary-button"
-            type="button"
-            onClick={() => playback.replaceAndPlay(tracks)}
-          >
-            Play loaded tracks
-          </button>
+          <div className="button-row">
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => playback.replaceAndPlay(tracks)}
+            >
+              Play loaded tracks
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => playback.shuffleAndPlay(tracks)}
+            >
+              Shuffle loaded tracks
+            </button>
+          </div>
         )}
       </PageHeader>
       {query.isPending ? (

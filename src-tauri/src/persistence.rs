@@ -26,6 +26,24 @@ pub struct CustomThemeColors {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct TrackTableColumns {
+    #[serde(default = "default_standard_track_columns")]
+    pub standard: Vec<String>,
+    #[serde(default = "default_detailed_track_columns")]
+    pub detailed: Vec<String>,
+}
+
+impl Default for TrackTableColumns {
+    fn default() -> Self {
+        Self {
+            standard: default_standard_track_columns(),
+            detailed: default_detailed_track_columns(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PlayerSettings {
     pub volume: f64,
     pub muted: bool,
@@ -57,6 +75,8 @@ pub struct PlayerSettings {
     pub home_sections: Vec<String>,
     #[serde(default)]
     pub pinned_playlist_ids: Vec<String>,
+    #[serde(default)]
+    pub track_table_columns: TrackTableColumns,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,6 +91,8 @@ pub struct PersistedQueueItem {
 #[serde(rename_all = "camelCase")]
 pub struct QueueSnapshot {
     pub items: Vec<PersistedQueueItem>,
+    #[serde(default)]
+    pub unshuffled_occurrence_ids: Option<Vec<String>>,
     pub current_index: Option<usize>,
     pub position: f64,
     pub repeat_mode: String,
@@ -96,6 +118,7 @@ impl Default for PlayerSettings {
             close_to_tray: false,
             home_sections: default_home_sections(),
             pinned_playlist_ids: Vec::new(),
+            track_table_columns: TrackTableColumns::default(),
         }
     }
 }
@@ -168,6 +191,8 @@ fn valid_player_settings(settings: &PlayerSettings) -> bool {
             .pinned_playlist_ids
             .iter()
             .all(|id| !id.is_empty() && id.len() <= 512)
+        && valid_track_table_columns(&settings.track_table_columns.standard)
+        && valid_track_table_columns(&settings.track_table_columns.detailed)
 }
 
 fn valid_custom_theme_colors(colors: &CustomThemeColors) -> bool {
@@ -254,6 +279,71 @@ fn default_home_sections() -> Vec<String> {
     .collect()
 }
 
+fn default_standard_track_columns() -> Vec<String> {
+    ["title", "artist", "album", "duration"]
+        .into_iter()
+        .map(str::to_owned)
+        .collect()
+}
+
+fn default_detailed_track_columns() -> Vec<String> {
+    [
+        "title",
+        "artist",
+        "album",
+        "tags",
+        "duration",
+        "playCount",
+        "rating",
+        "format",
+        "bitRate",
+        "size",
+    ]
+    .into_iter()
+    .map(str::to_owned)
+    .collect()
+}
+
+fn valid_track_table_columns(columns: &[String]) -> bool {
+    if columns.is_empty() || columns.len() > 28 || !columns.iter().any(|column| column == "title") {
+        return false;
+    }
+    let mut unique = std::collections::HashSet::new();
+    columns.iter().all(|column| {
+        matches!(
+            column.as_str(),
+            "title"
+                | "artist"
+                | "album"
+                | "displayAlbumArtist"
+                | "track"
+                | "discNumber"
+                | "year"
+                | "genres"
+                | "moods"
+                | "tags"
+                | "duration"
+                | "playCount"
+                | "rating"
+                | "averageRating"
+                | "starred"
+                | "bpm"
+                | "format"
+                | "suffix"
+                | "contentType"
+                | "bitRate"
+                | "bitDepth"
+                | "samplingRate"
+                | "channelCount"
+                | "size"
+                | "created"
+                | "comment"
+                | "sortName"
+                | "musicBrainzId"
+        ) && unique.insert(column)
+    })
+}
+
 fn valid_home_sections(sections: &[String]) -> bool {
     if sections.len() > 8 {
         return false;
@@ -304,16 +394,41 @@ pub fn clear_queue_snapshot<R: Runtime>(app: &AppHandle<R>) -> AppResult<()> {
 }
 
 fn valid_queue_snapshot(snapshot: &QueueSnapshot) -> bool {
-    snapshot.items.len() <= 10_000
+    let base_is_valid = valid_queue_items(&snapshot.items)
         && snapshot.position.is_finite()
         && snapshot.position >= 0.0
         && snapshot
             .current_index
             .is_none_or(|index| index < snapshot.items.len())
-        && matches!(snapshot.repeat_mode.as_str(), "off" | "queue" | "one")
-        && snapshot.items.iter().all(|item| {
+        && matches!(snapshot.repeat_mode.as_str(), "off" | "queue" | "one");
+    if !base_is_valid {
+        return false;
+    }
+    let Some(unshuffled_occurrence_ids) = &snapshot.unshuffled_occurrence_ids else {
+        return true;
+    };
+    if unshuffled_occurrence_ids.len() != snapshot.items.len() {
+        return false;
+    }
+    let visible_occurrences: std::collections::HashSet<_> = snapshot
+        .items
+        .iter()
+        .map(|item| item.occurrence_id.as_str())
+        .collect();
+    let mut canonical_occurrences = std::collections::HashSet::new();
+    unshuffled_occurrence_ids.iter().all(|occurrence_id| {
+        visible_occurrences.contains(occurrence_id.as_str())
+            && canonical_occurrences.insert(occurrence_id.as_str())
+    })
+}
+
+fn valid_queue_items(items: &[PersistedQueueItem]) -> bool {
+    let mut occurrence_ids = std::collections::HashSet::new();
+    items.len() <= 10_000
+        && items.iter().all(|item| {
             !item.occurrence_id.is_empty()
                 && item.occurrence_id.len() <= 100
+                && occurrence_ids.insert(item.occurrence_id.as_str())
                 && !item.playback_session_id.is_empty()
                 && item.playback_session_id.len() <= 100
         })
@@ -327,12 +442,48 @@ mod tests {
     fn rejects_out_of_range_queue_index() {
         let snapshot = QueueSnapshot {
             items: Vec::new(),
+            unshuffled_occurrence_ids: None,
             current_index: Some(0),
             position: 0.0,
             repeat_mode: "off".to_owned(),
             shuffle_mode: false,
         };
         assert!(!valid_queue_snapshot(&snapshot));
+    }
+
+    #[test]
+    fn canonical_queue_must_match_visible_occurrences() {
+        let first = persisted_queue_item("occurrence-1", "track-1");
+        let second = persisted_queue_item("occurrence-2", "track-2");
+        let mut snapshot = QueueSnapshot {
+            items: vec![first.clone(), second.clone()],
+            unshuffled_occurrence_ids: Some(vec![
+                second.occurrence_id.clone(),
+                first.occurrence_id.clone(),
+            ]),
+            current_index: Some(0),
+            position: 12.0,
+            repeat_mode: "off".to_owned(),
+            shuffle_mode: true,
+        };
+        assert!(valid_queue_snapshot(&snapshot));
+
+        snapshot.unshuffled_occurrence_ids.as_mut().unwrap()[0] = "other-occurrence".to_owned();
+        assert!(!valid_queue_snapshot(&snapshot));
+    }
+
+    #[test]
+    fn queue_snapshots_without_a_canonical_order_migrate_to_none() {
+        let snapshot: QueueSnapshot = serde_json::from_value(serde_json::json!({
+            "items": [],
+            "currentIndex": null,
+            "position": 0,
+            "repeatMode": "off",
+            "shuffleMode": false
+        }))
+        .unwrap();
+        assert!(snapshot.unshuffled_occurrence_ids.is_none());
+        assert!(valid_queue_snapshot(&snapshot));
     }
 
     #[test]
@@ -343,6 +494,15 @@ mod tests {
             "newest".to_owned()
         ]));
         assert!(!valid_home_sections(&["unknown".to_owned()]));
+    }
+
+    fn persisted_queue_item(occurrence_id: &str, track_id: &str) -> PersistedQueueItem {
+        serde_json::from_value(serde_json::json!({
+            "occurrenceId": occurrence_id,
+            "playbackSessionId": format!("session-{occurrence_id}"),
+            "track": { "id": track_id, "title": "Track" }
+        }))
+        .unwrap()
     }
 
     #[test]
@@ -393,11 +553,34 @@ mod tests {
     fn settings_saved_before_custom_colors_migrate_to_theme_defaults() {
         let mut stored = serde_json::to_value(PlayerSettings::default()).unwrap();
         stored.as_object_mut().unwrap().remove("customColors");
+        stored.as_object_mut().unwrap().remove("trackTableColumns");
 
         let migrated: PlayerSettings = serde_json::from_value(stored).unwrap();
         assert!(migrated.custom_colors.accent.is_none());
         assert!(migrated.custom_colors.background.is_none());
         assert!(migrated.custom_colors.surface.is_none());
+        assert_eq!(
+            migrated.track_table_columns.standard,
+            default_standard_track_columns()
+        );
+        assert_eq!(
+            migrated.track_table_columns.detailed,
+            default_detailed_track_columns()
+        );
         assert!(valid_player_settings(&migrated));
+    }
+
+    #[test]
+    fn track_table_columns_must_be_known_unique_and_keep_title() {
+        assert!(valid_track_table_columns(&default_standard_track_columns()));
+        assert!(!valid_track_table_columns(&[
+            "title".to_owned(),
+            "title".to_owned(),
+        ]));
+        assert!(!valid_track_table_columns(&["artist".to_owned()]));
+        assert!(!valid_track_table_columns(&[
+            "title".to_owned(),
+            "downloadedField".to_owned(),
+        ]));
     }
 }

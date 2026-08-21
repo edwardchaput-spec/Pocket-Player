@@ -45,13 +45,22 @@ export function GenrePage({ session }: { session: Session }) {
           <h1>{genre}</h1>
         </div>
         {tracks.length > 0 && (
-          <button
-            className="primary-button"
-            type="button"
-            onClick={() => playback.replaceAndPlay(tracks)}
-          >
-            Play all
-          </button>
+          <div className="button-row">
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => playback.replaceAndPlay(tracks)}
+            >
+              Play all
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => playback.shuffleAndPlay(tracks)}
+            >
+              Shuffle loaded tracks
+            </button>
+          </div>
         )}
       </PageHeader>
       {query.isPending ? (
