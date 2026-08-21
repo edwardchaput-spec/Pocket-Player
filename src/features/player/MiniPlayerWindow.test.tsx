@@ -74,6 +74,7 @@ it('observes the owner state and sends explicit matching playback controls', asy
     duration: 180,
     volume: 0.35,
     muted: false,
+    shuffleMode: false,
     queueLength: 3,
     currentIndex: 0,
   };
@@ -93,6 +94,7 @@ it('observes the owner state and sends explicit matching playback controls', asy
     target: { value: '0.7' },
   });
   await userEvent.click(screen.getByRole('button', { name: 'Mute' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Enable shuffle' }));
 
   expect(mocks.sendDesktopControl).toHaveBeenCalledWith({ action: 'pause' });
   expect(mocks.sendDesktopControl).toHaveBeenCalledWith({ action: 'previous' });
@@ -100,8 +102,20 @@ it('observes the owner state and sends explicit matching playback controls', asy
   expect(mocks.sendDesktopControl).toHaveBeenCalledWith({ action: 'seek', value: 64 });
   expect(mocks.sendDesktopControl).toHaveBeenCalledWith({ action: 'volume', value: 0.7 });
   expect(mocks.sendDesktopControl).toHaveBeenCalledWith({ action: 'mute', muted: true });
+  expect(mocks.sendDesktopControl).toHaveBeenCalledWith({ action: 'toggle-shuffle' });
 
-  act(() => mocks.playbackListeners[0]?.({ ...state, status: 'paused', muted: true }));
+  act(() =>
+    mocks.playbackListeners[0]?.({
+      ...state,
+      status: 'paused',
+      muted: true,
+      shuffleMode: true,
+    }),
+  );
+  expect(screen.getByRole('button', { name: 'Disable shuffle' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await userEvent.click(screen.getByRole('button', { name: 'Play' }));
   await userEvent.click(screen.getByRole('button', { name: 'Unmute' }));
   expect(mocks.sendDesktopControl).toHaveBeenCalledWith({ action: 'play' });

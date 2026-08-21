@@ -20,6 +20,8 @@ export const QueuePopover = memo(function QueuePopover({
     useShallow((playback) => ({
       queue: playback.queue,
       currentIndex: playback.currentIndex,
+      position: playback.position,
+      duration: playback.duration,
       shuffleMode: playback.shuffleMode,
       repeatMode: playback.repeatMode,
       toggleShuffle: playback.toggleShuffle,
@@ -65,6 +67,7 @@ export const QueuePopover = memo(function QueuePopover({
   if (!open) return null;
 
   const position = state.currentIndex == null ? 0 : state.currentIndex + 1;
+  const current = state.currentIndex == null ? undefined : state.queue[state.currentIndex];
 
   return (
     <>
@@ -111,6 +114,20 @@ export const QueuePopover = memo(function QueuePopover({
             </button>
           </header>
 
+          {current && (
+            <div
+              className="queue-popover__current"
+              aria-label={`Now playing ${current.track.title}, ${formatDuration(state.position)} of ${formatDuration(state.duration || current.track.duration)}`}
+            >
+              <span>Now playing</span>
+              <strong>{current.track.title}</strong>
+              <time>
+                {formatDuration(state.position)} /{' '}
+                {formatDuration(state.duration || current.track.duration)}
+              </time>
+            </div>
+          )}
+
           <div className="queue-popover__tools" role="group" aria-label="Queue options">
             <button
               className={state.shuffleMode ? 'is-active' : ''}
@@ -147,6 +164,7 @@ export const QueuePopover = memo(function QueuePopover({
                   <button
                     className="queue-popover__track"
                     type="button"
+                    aria-label={`Play ${item.track.title}, by ${item.track.displayArtist ?? item.track.artist ?? 'Unknown artist'}${item.track.album ? `, from ${item.track.album}` : ''}, ${formatDuration(item.track.duration)}`}
                     aria-current={isCurrent ? 'true' : undefined}
                     onClick={() => state.jumpTo(index)}
                   >

@@ -18,6 +18,7 @@ const EMPTY: SharedPlaybackState = {
   duration: 0,
   volume: 0.8,
   muted: false,
+  shuffleMode: false,
   queueLength: 0,
   currentIndex: null,
 };
@@ -172,6 +173,16 @@ export function MiniPlayerWindow() {
         </div>
         <div className="mini-controls">
           <button
+            className={state.shuffleMode ? 'mini-shuffle is-active' : 'mini-shuffle'}
+            type="button"
+            aria-label={state.shuffleMode ? 'Disable shuffle' : 'Enable shuffle'}
+            aria-pressed={state.shuffleMode}
+            title={state.shuffleMode ? 'Disable shuffle' : 'Enable shuffle'}
+            onClick={() => void sendDesktopControl({ action: 'toggle-shuffle' })}
+          >
+            <MiniIcon name="shuffle" />
+          </button>
+          <button
             type="button"
             aria-label="Previous"
             disabled={!track}
@@ -246,7 +257,14 @@ function isPlaybackActive(status: SharedPlaybackState['status']): boolean {
   return status === 'loading' || status === 'playing' || status === 'stalled';
 }
 
-function MiniIcon({ name }: { name: 'pin' | 'extend' | 'minimize' | 'close' }) {
+function MiniIcon({ name }: { name: 'pin' | 'extend' | 'minimize' | 'close' | 'shuffle' }) {
+  if (name === 'shuffle') {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 24 24">
+        <path d="M4 7h3c4 0 5 10 9 10h4M17 14l3 3-3 3M4 17h3c1.5 0 2.6-1.4 3.7-3.2M14 7h6M17 4l3 3-3 3" />
+      </svg>
+    );
+  }
   if (name === 'pin') {
     return (
       <svg aria-hidden="true" viewBox="0 0 24 24">

@@ -1,21 +1,30 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { formatDuration } from '../../lib/format';
 import { songsFixture } from '../../test/fixtures';
 import { replaceQueue } from '../player/queue';
 import { usePlaybackStore } from '../player/playbackStore';
 import { QueuePopover } from './QueuePopover';
 
+const queueSongs = songsFixture.map((song) => ({
+  ...song,
+  artist: `${song.title} Artist`,
+  album: `${song.title} Album`,
+}));
+
 describe('QueuePopover', () => {
   beforeEach(() => {
     usePlaybackStore.setState(usePlaybackStore.getInitialState(), true);
-    const queue = replaceQueue(songsFixture, 1);
+    const queue = replaceQueue(queueSongs, 1);
     usePlaybackStore.setState({
       queue: queue.items,
       currentIndex: queue.currentIndex,
       status: 'paused',
+      position: 42,
+      duration: 180,
     });
   });
 
@@ -36,8 +45,30 @@ describe('QueuePopover', () => {
 
     expect(screen.getByRole('region', { name: 'Queue' })).toBeInTheDocument();
     expect(screen.getByLabelText('2 of 3')).toBeInTheDocument();
+    expect(screen.getByLabelText('Now playing Third, 0:42 of 3:00')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /^FirstUnknown artist 3:10$/i }));
+    for (const song of queueSongs) {
+      const rowButton = screen.getByRole('button', {
+        name: `Play ${song.title}, by ${song.artist}, from ${song.album}, ${formatDuration(song.duration)}`,
+      });
+      const row = rowButton.closest('li');
+      expect(row).not.toBeNull();
+      expect(within(row!).getByText(song.title, { selector: 'strong' })).toBeVisible();
+      expect(
+        within(row!).getByText(`${song.artist} · ${song.album}`, { selector: 'small' }),
+      ).toBeVisible();
+      expect(
+        within(row!).getByText(formatDuration(song.duration), {
+          selector: '.queue-popover__duration',
+        }),
+      ).toBeVisible();
+    }
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Play First, by First Artist, from First Album, 3:10',
+      }),
+    );
     expect(usePlaybackStore.getState()).toMatchObject({ currentIndex: 2, status: 'loading' });
 
     await user.click(screen.getByRole('button', { name: 'Move Second down' }));
@@ -85,7 +116,11 @@ describe('QueuePopover', () => {
       </>,
     );
 
-    await user.click(screen.getByRole('button', { name: /^ThirdUnknown artist 3:00$/i }));
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Play Third, by Third Artist, from Third Album, 3:00',
+      }),
+    );
 
     const playback = usePlaybackStore.getState();
     expect(playback.currentIndex).toBe(1);

@@ -40,6 +40,21 @@ export const sessionFixture: Session = {
       'pinnedPlaylists',
     ],
     pinnedPlaylistIds: [],
+    trackTableColumns: {
+      standard: ['title', 'artist', 'album', 'duration'],
+      detailed: [
+        'title',
+        'artist',
+        'album',
+        'tags',
+        'duration',
+        'playCount',
+        'rating',
+        'format',
+        'bitRate',
+        'size',
+      ],
+    },
   },
 };
 

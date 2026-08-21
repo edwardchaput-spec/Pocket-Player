@@ -16,6 +16,7 @@ export interface DesktopControl {
     | 'seek'
     | 'volume'
     | 'mute'
+    | 'toggle-shuffle'
     | 'open-mini'
     | 'show-main'
     | 'navigate-main'
@@ -33,6 +34,7 @@ export interface SharedPlaybackState {
   duration: number;
   volume: number;
   muted: boolean;
+  shuffleMode: boolean;
   queueLength: number;
   currentIndex: number | null;
 }
@@ -57,10 +59,10 @@ export async function openMiniPlayer(): Promise<void> {
   const window = new WebviewWindow('mini-player', {
     url: '/mini-player',
     title: 'Pocket Player Mini Player',
-    width: 540,
-    height: 190,
-    minWidth: 480,
-    minHeight: 170,
+    width: 640,
+    height: 200,
+    minWidth: 600,
+    minHeight: 180,
     resizable: true,
     decorations: false,
     shadow: true,

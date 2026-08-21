@@ -233,6 +233,12 @@ pub async fn get_artist(state: State<'_, AppState>, artist_id: String) -> AppRes
 }
 
 #[tauri::command]
+pub async fn artist_songs(state: State<'_, AppState>, artist_id: String) -> AppResult<Vec<Song>> {
+    let client = state.client().await.ok_or_else(AppError::no_session)?;
+    client.get_artist_songs(&artist_id).await
+}
+
+#[tauri::command]
 pub async fn genres(state: State<'_, AppState>) -> AppResult<Vec<Genre>> {
     let client = state.client().await.ok_or_else(AppError::no_session)?;
     client.get_genres().await

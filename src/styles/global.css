@@ -173,19 +173,36 @@ body {
   text-decoration: underline;
 }
 .mini-controls {
-  display: flex;
+  display: grid;
+  grid-template-columns: 28px 28px 34px 28px minmax(70px, 1fr) auto 28px minmax(64px, 84px);
   gap: var(--space-1);
   align-items: center;
 }
 .mini-controls button {
+  width: 28px;
   min-height: 30px;
-  padding: 0 var(--space-2);
+  display: grid;
+  padding: 0;
+  place-items: center;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   font-size: 0.7rem;
+}
+.mini-controls button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+.mini-controls button.is-active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-strong);
 }
 .mini-window-actions {
   display: flex;
@@ -251,13 +268,12 @@ body {
   font-size: 1rem;
 }
 .mini-controls input {
-  min-width: 60px;
-  flex: 1;
+  width: 100%;
+  min-width: 0;
 }
 .mini-controls .mini-volume {
-  min-width: 42px;
-  max-width: 58px;
-  flex-basis: 50px;
+  min-width: 0;
+  max-width: none;
 }
 .mini-controls > span {
   color: var(--text-muted);
@@ -755,6 +771,9 @@ button:disabled {
   margin: 0 auto;
   padding: 30px clamp(20px, 4vw, 48px) 42px;
 }
+.page-content:has(.track-table-scroll) {
+  width: 100%;
+}
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -1035,7 +1054,7 @@ audio {
   inset: auto 0 0;
   min-height: var(--player-height);
   display: grid;
-  grid-template-columns: minmax(190px, 1fr) minmax(320px, 1.5fr) minmax(150px, 1fr);
+  grid-template-columns: minmax(190px, 1fr) minmax(320px, 1.5fr) minmax(250px, 1fr);
   gap: 18px;
   align-items: center;
   padding: 9px 20px;
@@ -1103,7 +1122,7 @@ audio {
   align-items: center;
 }
 .player-controls button,
-.volume-control button {
+.volume-control > button {
   width: 32px;
   height: 32px;
   border: 0;
@@ -1112,8 +1131,12 @@ audio {
   cursor: pointer;
 }
 .player-controls button:hover,
-.volume-control button:hover {
+.volume-control > button:hover {
   background: var(--surface-hover);
+}
+.player-controls button.is-active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 46%, transparent);
 }
 .player-controls .play-toggle {
   width: 38px;
@@ -1139,13 +1162,42 @@ input[type='range'] {
   width: 100%;
 }
 .volume-control {
+  min-width: 0;
   display: flex;
   justify-content: end;
   gap: var(--space-2);
   align-items: center;
 }
 .volume-control input {
-  width: min(120px, 50%);
+  width: clamp(64px, 7vw, 104px);
+  min-width: 0;
+}
+.player-utility-button,
+.volume-control a.player-utility-button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  flex: 0 0 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.player-utility-button:hover,
+.player-utility-button:focus-visible {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.player-utility-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
 }
 .player-error {
   max-width: 100%;

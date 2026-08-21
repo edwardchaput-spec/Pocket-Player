@@ -64,6 +64,7 @@ pub fn run() {
             commands::search_library,
             commands::artists,
             commands::get_artist,
+            commands::artist_songs,
             commands::genres,
             commands::songs_by_genre,
             commands::starred,

@@ -10,7 +10,9 @@ import {
   previousIndex,
   removeQueueItem,
   replaceQueue,
+  shuffledReplacementQueue,
   shuffledQueue,
+  shuffleUpcoming,
 } from './queue';
 
 describe('queue functions', () => {
@@ -52,5 +54,28 @@ describe('queue functions', () => {
     expect(shuffled.currentIndex).toBe(0);
     expect(shuffled.items[0]?.track.id).toBe('song-3');
     expect(shuffled.items.map((item) => item.track.id)).toEqual(['song-3', 'song-1', 'song-2']);
+  });
+
+  it('randomizes a fresh queue including which track plays first', () => {
+    const values = [0.5, 0, 0];
+    const shuffled = shuffledReplacementQueue(
+      replaceQueue(songsFixture),
+      () => values.shift() ?? 0,
+    );
+
+    expect(shuffled.currentIndex).toBe(0);
+    expect(shuffled.items[0]?.track.id).toBe('song-3');
+    expect(new Set(shuffled.items.map((item) => item.track.id))).toEqual(
+      new Set(songsFixture.map((track) => track.id)),
+    );
+  });
+
+  it('shuffles only upcoming items when a shuffled queue grows', () => {
+    const state = replaceQueue(songsFixture, 1);
+    const shuffled = shuffleUpcoming(state, () => 0);
+
+    expect(shuffled.currentIndex).toBe(1);
+    expect(shuffled.items.slice(0, 2)).toEqual(state.items.slice(0, 2));
+    expect(shuffled.items[2]).toEqual(state.items[2]);
   });
 });

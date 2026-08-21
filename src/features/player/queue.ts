@@ -86,13 +86,35 @@ export function shuffledQueue(state: QueueState, random: () => number = Math.ran
   if (state.items.length < 2) return state;
   const current = state.currentIndex == null ? undefined : state.items[state.currentIndex];
   const rest = state.items.filter((item) => item.occurrenceId !== current?.occurrenceId);
-  for (let index = rest.length - 1; index > 0; index -= 1) {
-    const swap = Math.floor(random() * (index + 1));
-    [rest[index], rest[swap]] = [rest[swap]!, rest[index]!];
-  }
+  shuffleItems(rest, random);
   return current
     ? { items: [current, ...rest], currentIndex: 0 }
     : { items: rest, currentIndex: null };
+}
+
+/** Shuffle only tracks that have not played yet, retaining history and the current occurrence. */
+export function shuffleUpcoming(state: QueueState, random: () => number = Math.random): QueueState {
+  if (state.items.length < 2) return state;
+  const boundary = state.currentIndex == null ? 0 : state.currentIndex + 1;
+  const upcoming = state.items.slice(boundary);
+  shuffleItems(upcoming, random);
+  return {
+    items: [...state.items.slice(0, boundary), ...upcoming],
+    currentIndex: state.currentIndex,
+  };
+}
+
+/** Build a fresh shuffled queue where every track, including the first, is randomized. */
+export function shuffledReplacementQueue(
+  replacement: QueueState,
+  random: () => number = Math.random,
+): QueueState {
+  if (replacement.items.length < 2) return replacement;
+  const startIndex = Math.min(
+    replacement.items.length - 1,
+    Math.floor(random() * replacement.items.length),
+  );
+  return shuffledQueue({ ...replacement, currentIndex: startIndex }, random);
 }
 
 export function orderedAlbumTracks(tracks: Song[]): Song[] {
@@ -102,4 +124,11 @@ export function orderedAlbumTracks(tracks: Song[]): Song[] {
       (left.track ?? Number.MAX_SAFE_INTEGER) - (right.track ?? Number.MAX_SAFE_INTEGER) ||
       left.title.localeCompare(right.title),
   );
+}
+
+function shuffleItems<T>(items: T[], random: () => number): void {
+  for (let index = items.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(random() * (index + 1));
+    [items[index], items[swap]] = [items[swap]!, items[index]!];
+  }
 }

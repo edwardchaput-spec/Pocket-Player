@@ -1,9 +1,15 @@
-import { useMemo, useState } from 'react';
+import { type ReactNode, useId, useMemo, useState } from 'react';
 
-import { formatDuration } from '../lib/format';
-import { Song } from '../lib/tauri/types';
+import { usePlaybackStore } from '../features/player/playbackStore';
+import { formatDate, formatDuration } from '../lib/format';
+import {
+  DEFAULT_DETAILED_TRACK_COLUMNS,
+  DEFAULT_STANDARD_TRACK_COLUMNS,
+  Song,
+  type TrackTableColumnId as PersistedTrackTableColumnId,
+} from '../lib/tauri/types';
 import { AddToPlaylistButton, FavoriteButton, RatingControl } from './LibraryActions';
-import { AlbumLink, ArtistLink, TrackTagLinks, trackTagNames } from './LibraryLinks';
+import { AlbumLink, ArtistLink, TagLink, TrackTagLinks, trackTagNames } from './LibraryLinks';
 import './TrackTable.css';
 
 export type TrackTableSortKey =
@@ -23,6 +29,10 @@ export interface TrackTableSort {
   direction: 'ascending' | 'descending';
 }
 
+export type TrackTableColumnId = PersistedTrackTableColumnId;
+export const STANDARD_TRACK_COLUMNS: readonly TrackTableColumnId[] = DEFAULT_STANDARD_TRACK_COLUMNS;
+export const DETAILED_TRACK_COLUMNS: readonly TrackTableColumnId[] = DEFAULT_DETAILED_TRACK_COLUMNS;
+
 interface TrackTableProps {
   tracks: Song[];
   onPlay: (index: number, displayedTracks: Song[]) => void;
@@ -34,12 +44,230 @@ interface TrackTableProps {
   onSortChange?: ((sort: TrackTableSort) => void) | undefined;
   /** Render the supplied order while still exposing controlled sortable headers. */
   manualSorting?: boolean | undefined;
+  /** The visible data columns. Title is always restored if it is omitted. */
+  visibleColumns?: readonly TrackTableColumnId[] | undefined;
+  onVisibleColumnsChange?: ((columns: TrackTableColumnId[]) => void) | undefined;
 }
 
 const TEXT_COLLATOR = new Intl.Collator(undefined, {
   numeric: true,
   sensitivity: 'base',
 });
+
+interface TrackTableColumnDefinition {
+  id: TrackTableColumnId;
+  label: string;
+  className?: string;
+  sortKey?: TrackTableSortKey;
+  render: (track: Song) => ReactNode;
+}
+
+const TRACK_TABLE_COLUMNS: readonly TrackTableColumnDefinition[] = [
+  {
+    id: 'title',
+    label: 'Title',
+    className: 'track-column-title',
+    sortKey: 'title',
+    render: (track) => (
+      <>
+        <strong title={track.title}>{track.title}</strong>
+        <small>
+          {track.discNumber != null ? `D${track.discNumber} ` : ''}
+          {track.track != null ? `T${track.track}` : ''}
+        </small>
+      </>
+    ),
+  },
+  {
+    id: 'artist',
+    label: 'Artist',
+    className: 'track-column-artist',
+    sortKey: 'artist',
+    render: (track) => (
+      <ArtistLink
+        artistId={track.artistId}
+        className="track-cell-link"
+        name={track.displayArtist ?? track.artist}
+      />
+    ),
+  },
+  {
+    id: 'album',
+    label: 'Album',
+    className: 'track-column-album',
+    sortKey: 'album',
+    render: (track) => (
+      <AlbumLink albumId={track.albumId} className="track-cell-link" name={track.album} />
+    ),
+  },
+  {
+    id: 'displayAlbumArtist',
+    label: 'Album artist',
+    className: 'track-column-album-artist',
+    render: (track) => <TextCell value={track.displayAlbumArtist} />,
+  },
+  {
+    id: 'track',
+    label: 'Track',
+    className: 'numeric track-column-track',
+    render: (track) => track.track?.toLocaleString() ?? '—',
+  },
+  {
+    id: 'discNumber',
+    label: 'Disc',
+    className: 'numeric track-column-disc',
+    render: (track) => track.discNumber?.toLocaleString() ?? '—',
+  },
+  {
+    id: 'year',
+    label: 'Year',
+    className: 'numeric track-column-year',
+    render: (track) => track.year?.toLocaleString() ?? '—',
+  },
+  {
+    id: 'genres',
+    label: 'Genres',
+    className: 'track-column-tags',
+    render: (track) => <MetadataTagLinks names={genreNames(track)} />,
+  },
+  {
+    id: 'moods',
+    label: 'Moods',
+    className: 'track-column-tags',
+    render: (track) => <MetadataTagLinks names={cleanNames(track.moods ?? [])} />,
+  },
+  {
+    id: 'tags',
+    label: 'Tags',
+    className: 'track-column-tags',
+    sortKey: 'tags',
+    render: (track) => (
+      <div className="tag-list">
+        <TrackTagLinks track={track} />
+        {track.year != null && <span>{track.year}</span>}
+        {track.bpm != null && <span>{track.bpm} BPM</span>}
+      </div>
+    ),
+  },
+  {
+    id: 'duration',
+    label: 'Length',
+    className: 'numeric track-column-duration',
+    sortKey: 'duration',
+    render: (track) => formatDuration(track.duration),
+  },
+  {
+    id: 'playCount',
+    label: 'Plays',
+    className: 'numeric track-column-plays',
+    sortKey: 'playCount',
+    render: (track) => track.playCount?.toLocaleString() ?? '—',
+  },
+  {
+    id: 'rating',
+    label: 'Rating',
+    className: 'track-column-rating',
+    sortKey: 'rating',
+    render: (track) => <RatingControl id={track.id} value={track.userRating} />,
+  },
+  {
+    id: 'averageRating',
+    label: 'Average rating',
+    className: 'numeric track-column-average-rating',
+    render: (track) => ratingLabel(track.averageRating),
+  },
+  {
+    id: 'starred',
+    label: 'Favourite',
+    className: 'track-column-favourite',
+    render: (track) => (
+      <span aria-label={track.starred ? 'Favourite' : 'Not favourite'}>
+        {track.starred ? 'Yes' : '—'}
+      </span>
+    ),
+  },
+  {
+    id: 'bpm',
+    label: 'BPM',
+    className: 'numeric track-column-bpm',
+    render: (track) => (track.bpm != null ? `${track.bpm.toLocaleString()} BPM` : '—'),
+  },
+  {
+    id: 'format',
+    label: 'Format',
+    className: 'track-format',
+    sortKey: 'format',
+    render: formatLabel,
+  },
+  {
+    id: 'suffix',
+    label: 'File type',
+    className: 'technical track-column-file-type',
+    render: (track) => fileFormat(track) ?? '—',
+  },
+  {
+    id: 'contentType',
+    label: 'Content type',
+    className: 'technical track-column-content-type',
+    render: (track) => <TextCell value={track.contentType} />,
+  },
+  {
+    id: 'bitRate',
+    label: 'Bitrate',
+    className: 'numeric track-bitrate',
+    sortKey: 'bitRate',
+    render: bitRateLabel,
+  },
+  {
+    id: 'bitDepth',
+    label: 'Bit depth',
+    className: 'numeric track-column-bit-depth',
+    render: (track) => (track.bitDepth != null ? `${track.bitDepth}-bit` : '—'),
+  },
+  {
+    id: 'samplingRate',
+    label: 'Sample rate',
+    className: 'numeric track-column-sample-rate',
+    render: (track) => sampleRateLabel(track.samplingRate) ?? '—',
+  },
+  {
+    id: 'channelCount',
+    label: 'Channels',
+    className: 'numeric track-column-channels',
+    render: (track) => (track.channelCount != null ? `${track.channelCount} ch` : '—'),
+  },
+  {
+    id: 'size',
+    label: 'Size',
+    className: 'numeric track-size',
+    sortKey: 'size',
+    render: sizeLabel,
+  },
+  {
+    id: 'created',
+    label: 'Date added',
+    className: 'track-column-created',
+    render: (track) => (track.created ? formatDate(track.created) : '—'),
+  },
+  {
+    id: 'comment',
+    label: 'Comment',
+    className: 'track-column-comment',
+    render: (track) => <TextCell value={track.comment} />,
+  },
+  {
+    id: 'sortName',
+    label: 'Sort name',
+    className: 'track-column-sort-name',
+    render: (track) => <TextCell value={track.sortName} />,
+  },
+  {
+    id: 'musicBrainzId',
+    label: 'MusicBrainz ID',
+    className: 'technical track-column-musicbrainz',
+    render: (track) => <TextCell value={track.musicBrainzId} />,
+  },
+];
 
 export function TrackTable({
   tracks,
@@ -50,10 +278,23 @@ export function TrackTable({
   sort,
   onSortChange,
   manualSorting = false,
+  visibleColumns,
+  onVisibleColumnsChange,
 }: TrackTableProps) {
   const [internalSort, setInternalSort] = useState<TrackTableSort | null>(null);
+  const [columnPickerOpen, setColumnPickerOpen] = useState(false);
+  const preset = detailed ? 'detailed' : 'standard';
+  const defaultColumns = detailed ? DETAILED_TRACK_COLUMNS : STANDARD_TRACK_COLUMNS;
+  const storedColumns = usePlaybackStore((state) => state.trackTableColumns[preset]);
+  const setStoredColumns = usePlaybackStore((state) => state.setTrackTableColumns);
+  const pickerId = useId();
   const controlled = sort !== undefined;
   const activeSort = controlled ? sort : internalSort;
+  const selectedColumnIds = normalizeVisibleColumns(visibleColumns ?? storedColumns);
+  const selectedColumnSet = new Set(selectedColumnIds);
+  const visibleColumnDefinitions = TRACK_TABLE_COLUMNS.filter((column) =>
+    selectedColumnSet.has(column.id),
+  );
   const rows = useMemo(() => {
     const sourceRows = tracks.map((track, sourceIndex) => ({ track, sourceIndex }));
     if (!activeSort || manualSorting) return sourceRows;
@@ -76,148 +317,192 @@ export function TrackTable({
     onSortChange?.(next);
   };
 
+  const commitVisibleColumns = (columns: readonly TrackTableColumnId[]) => {
+    const next = normalizeVisibleColumns(columns);
+    if (visibleColumns === undefined) setStoredColumns(preset, next);
+    onVisibleColumnsChange?.(next);
+  };
+
+  const toggleColumn = (columnId: TrackTableColumnId, checked: boolean) => {
+    if (columnId === 'title') return;
+    commitVisibleColumns(
+      checked
+        ? [...selectedColumnIds, columnId]
+        : selectedColumnIds.filter((id) => id !== columnId),
+    );
+  };
+
   return (
-    <div className="track-table-scroll">
-      <table className={`track-table ${detailed ? 'is-detailed' : ''}`}>
-        <thead>
-          <tr>
-            <th scope="col" aria-label="Play" />
-            <SortableHeader label="Title" sortKey="title" sort={activeSort} onSort={requestSort} />
-            <SortableHeader
-              label="Artist"
-              sortKey="artist"
-              sort={activeSort}
-              onSort={requestSort}
-            />
-            <SortableHeader label="Album" sortKey="album" sort={activeSort} onSort={requestSort} />
-            {detailed && (
-              <SortableHeader label="Tags" sortKey="tags" sort={activeSort} onSort={requestSort} />
-            )}
-            <SortableHeader
-              className="numeric"
-              label="Length"
-              sortKey="duration"
-              sort={activeSort}
-              onSort={requestSort}
-            />
-            {detailed && (
-              <SortableHeader
-                className="numeric"
-                label="Plays"
-                sortKey="playCount"
-                sort={activeSort}
-                onSort={requestSort}
-              />
-            )}
-            {detailed && (
-              <SortableHeader
-                label="Rating"
-                sortKey="rating"
-                sort={activeSort}
-                onSort={requestSort}
-              />
-            )}
-            {detailed && (
-              <SortableHeader
-                label="Format"
-                sortKey="format"
-                sort={activeSort}
-                onSort={requestSort}
-              />
-            )}
-            {detailed && (
-              <SortableHeader
-                className="numeric"
-                label="Bitrate"
-                sortKey="bitRate"
-                sort={activeSort}
-                onSort={requestSort}
-              />
-            )}
-            {detailed && (
-              <SortableHeader
-                className="numeric"
-                label="Size"
-                sortKey="size"
-                sort={activeSort}
-                onSort={requestSort}
-              />
-            )}
-            <th scope="col" aria-label="Actions" />
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(({ track, sourceIndex }, index) => (
-            <tr key={`${track.id}:${sourceIndex}`}>
-              <td>
-                <button
-                  className="row-play"
-                  type="button"
-                  onClick={() => onPlay(index, displayedTracks)}
-                >
-                  <span aria-hidden="true">▶</span>
-                  <span className="sr-only">Play {track.title}</span>
-                </button>
-              </td>
-              <td>
-                <strong>{track.title}</strong>
-                <small>
-                  {track.discNumber != null ? `D${track.discNumber} ` : ''}
-                  {track.track != null ? `T${track.track}` : ''}
-                </small>
-              </td>
-              <td>
-                <ArtistLink artistId={track.artistId} name={track.displayArtist ?? track.artist} />
-              </td>
-              <td>
-                <AlbumLink albumId={track.albumId} name={track.album} />
-              </td>
-              {detailed && (
+    <div className="track-table-panel">
+      <div className="track-table-toolbar">
+        <div className="track-column-picker">
+          <button
+            className="track-column-picker__trigger"
+            type="button"
+            aria-controls={pickerId}
+            aria-expanded={columnPickerOpen}
+            onClick={() => setColumnPickerOpen((open) => !open)}
+          >
+            Columns
+            <span aria-hidden="true">▾</span>
+          </button>
+          {columnPickerOpen && (
+            <div className="track-column-picker__menu" id={pickerId}>
+              <fieldset>
+                <legend>Visible columns</legend>
+                <div className="track-column-picker__options">
+                  {TRACK_TABLE_COLUMNS.map((column) => (
+                    <label key={column.id}>
+                      <input
+                        type="checkbox"
+                        checked={selectedColumnSet.has(column.id)}
+                        disabled={column.id === 'title'}
+                        onChange={(event) => toggleColumn(column.id, event.target.checked)}
+                      />
+                      <span>{column.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <button
+                className="track-column-picker__reset"
+                type="button"
+                onClick={() => commitVisibleColumns(defaultColumns)}
+              >
+                Reset columns
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="track-table-scroll">
+        <table className={`track-table ${detailed ? 'is-detailed' : ''}`}>
+          <thead>
+            <tr>
+              <th scope="col" aria-label="Play" />
+              {visibleColumnDefinitions.map((column) =>
+                column.sortKey ? (
+                  <SortableHeader
+                    key={column.id}
+                    className={column.className}
+                    label={column.label}
+                    sortKey={column.sortKey}
+                    sort={activeSort}
+                    onSort={requestSort}
+                  />
+                ) : (
+                  <th
+                    key={column.id}
+                    className={`track-static-header ${column.className ?? ''}`.trim()}
+                    scope="col"
+                  >
+                    {column.label}
+                  </th>
+                ),
+              )}
+              <th scope="col" aria-label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ track, sourceIndex }, index) => (
+              <tr key={`${track.id}:${sourceIndex}`}>
                 <td>
-                  <div className="tag-list">
-                    <TrackTagLinks track={track} />
-                    {track.year != null && <span>{track.year}</span>}
-                    {track.bpm != null && <span>{track.bpm} BPM</span>}
+                  <button
+                    className="row-play"
+                    type="button"
+                    onClick={() => onPlay(index, displayedTracks)}
+                  >
+                    <span aria-hidden="true">▶</span>
+                    <span className="sr-only">Play {track.title}</span>
+                  </button>
+                </td>
+                {visibleColumnDefinitions.map((column) => (
+                  <td key={column.id} className={column.className}>
+                    {column.render(track)}
+                  </td>
+                ))}
+                <td>
+                  <div className="row-actions">
+                    <FavoriteButton
+                      id={track.id}
+                      itemType="song"
+                      starred={track.starred}
+                      label={track.title}
+                    />
+                    <AddToPlaylistButton track={track} />
+                    {onPlayNext && (
+                      <button type="button" onClick={() => onPlayNext(track)} title="Play next">
+                        +1
+                      </button>
+                    )}
+                    {onAddToQueue && (
+                      <button
+                        type="button"
+                        onClick={() => onAddToQueue(track)}
+                        title="Add to queue"
+                      >
+                        +
+                      </button>
+                    )}
                   </div>
                 </td>
-              )}
-              <td className="numeric">{formatDuration(track.duration)}</td>
-              {detailed && <td className="numeric">{track.playCount?.toLocaleString() ?? '—'}</td>}
-              {detailed && (
-                <td>
-                  <RatingControl id={track.id} value={track.userRating} />
-                </td>
-              )}
-              {detailed && <td className="track-format">{formatLabel(track)}</td>}
-              {detailed && <td className="numeric track-bitrate">{bitRateLabel(track)}</td>}
-              {detailed && <td className="numeric track-size">{sizeLabel(track)}</td>}
-              <td>
-                <div className="row-actions">
-                  <FavoriteButton
-                    id={track.id}
-                    itemType="song"
-                    starred={track.starred}
-                    label={track.title}
-                  />
-                  <AddToPlaylistButton track={track} />
-                  {onPlayNext && (
-                    <button type="button" onClick={() => onPlayNext(track)} title="Play next">
-                      +1
-                    </button>
-                  )}
-                  {onAddToQueue && (
-                    <button type="button" onClick={() => onAddToQueue(track)} title="Add to queue">
-                      +
-                    </button>
-                  )}
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
+}
+
+function normalizeVisibleColumns(columns: readonly TrackTableColumnId[]): TrackTableColumnId[] {
+  const requested = new Set<TrackTableColumnId>(columns);
+  requested.add('title');
+  return TRACK_TABLE_COLUMNS.filter((column) => requested.has(column.id)).map(
+    (column) => column.id,
+  );
+}
+
+function TextCell({ value }: { value?: string | null | undefined }) {
+  const label = value?.trim() || '—';
+  return (
+    <span className="track-cell-text" title={label === '—' ? undefined : label}>
+      {label}
+    </span>
+  );
+}
+
+function MetadataTagLinks({ names }: { names: string[] }) {
+  if (names.length === 0) return <>—</>;
+  return (
+    <div className="tag-list">
+      {names.map((name) => (
+        <TagLink key={name.toLocaleLowerCase()} name={name} />
+      ))}
+    </div>
+  );
+}
+
+function genreNames(track: Song): string[] {
+  return cleanNames([track.genre, ...(track.genres ?? []).map((genre) => genre.name)]);
+}
+
+function cleanNames(values: readonly (string | null | undefined)[]): string[] {
+  const seen = new Set<string>();
+  return values.flatMap((value) => {
+    const name = value?.trim();
+    if (!name) return [];
+    const key = name.toLocaleLowerCase();
+    if (seen.has(key)) return [];
+    seen.add(key);
+    return [name];
+  });
+}
+
+function ratingLabel(value: number | null | undefined): string {
+  return value == null
+    ? '—'
+    : value.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 1 });
 }
 
 function SortableHeader({
@@ -231,7 +516,7 @@ function SortableHeader({
   sortKey: TrackTableSortKey;
   sort: TrackTableSort | null;
   onSort: (key: TrackTableSortKey) => void;
-  className?: string;
+  className?: string | undefined;
 }) {
   const direction = sort?.key === sortKey ? sort.direction : 'none';
   const nextDirection = direction === 'ascending' ? 'descending' : 'ascending';

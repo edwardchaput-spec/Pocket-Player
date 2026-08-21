@@ -1,10 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getTags, queryTracks } from '../../lib/tauri/library';
 import { sessionFixture, songsFixture } from '../../test/fixtures';
+import { usePlaybackStore } from '../player/playbackStore';
 import { TagPage } from './TagPage';
 import { TagsPage } from './TagsPage';
 
@@ -31,7 +33,10 @@ function renderRoute(path: string) {
 }
 
 describe('tag navigation', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    usePlaybackStore.setState(usePlaybackStore.getInitialState(), true);
+  });
 
   it('lists indexed tags with counts and exact detail links', async () => {
     vi.mocked(getTags).mockResolvedValue([
@@ -65,5 +70,27 @@ describe('tag navigation', () => {
     const artistLink = await screen.findByRole('link', { name: 'First Artist' });
     expect(queryTracks).toHaveBeenCalledWith(expect.objectContaining({ tag: 'Dream Pop' }));
     expect(artistLink).toHaveAttribute('href', '/artists/artist%3Aone');
+  });
+
+  it('shuffles all currently loaded tracks for the selected tag', async () => {
+    vi.mocked(queryTracks).mockResolvedValue({
+      tracks: songsFixture,
+      total: songsFixture.length,
+      refreshedAt: '2026-08-18T00:00:00Z',
+    });
+    const user = userEvent.setup();
+    renderRoute('/tags/Dream%20Pop');
+
+    await user.click(await screen.findByRole('button', { name: 'Shuffle loaded tracks' }));
+
+    const playback = usePlaybackStore.getState();
+    expect(playback.shuffleMode).toBe(true);
+    expect(new Set(playback.queue.map((item) => item.track.id))).toEqual(
+      new Set(songsFixture.map((track) => track.id)),
+    );
+    expect(playback.unshuffledQueue?.map((item) => item.track.id)).toEqual(
+      songsFixture.map((track) => track.id),
+    );
+    expect(screen.getByRole('button', { name: 'Play loaded tracks' })).toBeEnabled();
   });
 });

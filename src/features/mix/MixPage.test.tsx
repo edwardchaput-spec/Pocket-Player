@@ -5,7 +5,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { generateMix, getGenres, getTags } from '../../lib/tauri/library';
-import { sessionFixture } from '../../test/fixtures';
+import { sessionFixture, songsFixture } from '../../test/fixtures';
+import { usePlaybackStore } from '../player/playbackStore';
 import { MixPage } from './MixPage';
 
 vi.mock('../../lib/tauri/library', () => ({
@@ -35,6 +36,7 @@ function renderMix() {
 describe('Track Mix tag exclusions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    usePlaybackStore.setState(usePlaybackStore.getInitialState(), true);
     vi.mocked(getGenres).mockResolvedValue([
       { value: 'Rock', songCount: 12, albumCount: 2 },
       { value: 'Ambient', songCount: 8, albumCount: 1 },
@@ -112,5 +114,28 @@ describe('Track Mix tag exclusions', () => {
     await user.click(screen.getByRole('button', { name: 'Retry' }));
     expect(await screen.findByRole('checkbox', { name: 'Exclude Focused (Mood)' })).toBeVisible();
     expect(getTags).toHaveBeenCalledTimes(2);
+  });
+
+  it('shuffles every generated mix track through the shared playback action', async () => {
+    vi.mocked(getTags).mockResolvedValue([]);
+    vi.mocked(generateMix).mockResolvedValue({
+      seed: 'fixed-seed',
+      items: songsFixture.map((track) => ({ track, reason: 'Test candidate', score: 1 })),
+      warnings: [],
+    });
+    const user = renderMix();
+
+    await user.click(screen.getByRole('button', { name: 'Build mix' }));
+    await user.click(await screen.findByRole('button', { name: 'Shuffle all' }));
+
+    const playback = usePlaybackStore.getState();
+    expect(playback.shuffleMode).toBe(true);
+    expect(new Set(playback.queue.map((item) => item.track.id))).toEqual(
+      new Set(songsFixture.map((track) => track.id)),
+    );
+    expect(playback.unshuffledQueue?.map((item) => item.track.id)).toEqual(
+      songsFixture.map((track) => track.id),
+    );
+    expect(screen.getByRole('button', { name: 'Play mix' })).toBeEnabled();
   });
 });

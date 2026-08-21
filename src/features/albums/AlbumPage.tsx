@@ -23,6 +23,7 @@ export function AlbumPage({ session }: { session: Session }) {
     retry: (failureCount, error: AppError) => error.retryable && failureCount < 2,
   });
   const replaceAndPlay = usePlaybackStore((state) => state.replaceAndPlay);
+  const shuffleAndPlay = usePlaybackStore((state) => state.shuffleAndPlay);
 
   if (!decodedId)
     return <EmptyState title="Album not found" detail="The album address is invalid." />;
@@ -73,10 +74,10 @@ export function AlbumPage({ session }: { session: Session }) {
             <button
               className="secondary-button"
               type="button"
-              disabled={tracks.length < 2}
-              onClick={() => replaceAndPlay(shuffleTracks(tracks))}
+              disabled={tracks.length === 0}
+              onClick={() => shuffleAndPlay(tracks)}
             >
-              Shuffle
+              Shuffle all
             </button>
             <FavoriteButton
               id={album.id}
@@ -100,15 +101,6 @@ export function AlbumPage({ session }: { session: Session }) {
       )}
     </main>
   );
-}
-
-function shuffleTracks<T>(tracks: T[]): T[] {
-  const result = [...tracks];
-  for (let index = result.length - 1; index > 0; index -= 1) {
-    const swap = Math.floor(Math.random() * (index + 1));
-    [result[index], result[swap]] = [result[swap]!, result[index]!];
-  }
-  return result;
 }
 
 function AlbumSkeleton() {

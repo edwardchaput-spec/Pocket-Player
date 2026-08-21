@@ -2,10 +2,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { usePlaybackStore } from '../features/player/playbackStore';
 import { Song } from '../lib/tauri/types';
-import { TrackTable, TrackTableSort } from './TrackTable';
+import {
+  DETAILED_TRACK_COLUMNS,
+  STANDARD_TRACK_COLUMNS,
+  TrackTable,
+  type TrackTableColumnId,
+  TrackTableSort,
+} from './TrackTable';
 
 const tracks: Song[] = [
   {
@@ -18,6 +25,7 @@ const tracks: Song[] = [
     samplingRate: 48_000,
     bitRate: 320,
     size: 8 * 1024 * 1024,
+    musicBrainzId: 'musicbrainz:zulu',
   },
   {
     id: 'opaque:alpha',
@@ -42,6 +50,57 @@ const tracks: Song[] = [
 ];
 
 describe('TrackTable', () => {
+  beforeEach(() => {
+    usePlaybackStore.setState({
+      trackTableColumns: {
+        standard: [...STANDARD_TRACK_COLUMNS],
+        detailed: [...DETAILED_TRACK_COLUMNS],
+      },
+    });
+  });
+
+  it('preserves the standard and detailed default column sets', () => {
+    const standard = renderTrackTable({});
+    expect(STANDARD_TRACK_COLUMNS).toEqual(['title', 'artist', 'album', 'duration']);
+    expect(renderedColumnLabels()).toEqual([
+      'Play',
+      'Title',
+      'Artist',
+      'Album',
+      'Length',
+      'Actions',
+    ]);
+
+    standard.unmount();
+    renderTrackTable({ detailed: true });
+    expect(DETAILED_TRACK_COLUMNS).toEqual([
+      'title',
+      'artist',
+      'album',
+      'tags',
+      'duration',
+      'playCount',
+      'rating',
+      'format',
+      'bitRate',
+      'size',
+    ]);
+    expect(renderedColumnLabels()).toEqual([
+      'Play',
+      'Title',
+      'Artist',
+      'Album',
+      'Tags',
+      'Length',
+      'Plays',
+      'Rating',
+      'Format',
+      'Bitrate',
+      'Size',
+      'Actions',
+    ]);
+  });
+
   it('makes every displayed data column sortable and splits technical metadata', () => {
     renderTrackTable({ detailed: true });
 
@@ -65,6 +124,65 @@ describe('TrackTable', () => {
     expect(screen.getByText('FLAC 44.1 kHz · 24-bit · 2 ch')).toBeInTheDocument();
     expect(screen.getByText('1,411 kbps')).toBeInTheDocument();
     expect(screen.getByText('42.0 MB')).toBeInTheDocument();
+  });
+
+  it('adds a rich metadata column from the accessible column picker', async () => {
+    const user = userEvent.setup();
+    renderTrackTable({});
+
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    const musicBrainz = screen.getByRole('checkbox', { name: 'MusicBrainz ID' });
+    expect(musicBrainz).not.toBeChecked();
+    await user.click(musicBrainz);
+
+    expect(screen.getByRole('columnheader', { name: 'MusicBrainz ID' })).toBeInTheDocument();
+    expect(screen.getByText('musicbrainz:zulu')).toBeInTheDocument();
+  });
+
+  it('can hide a default column while retaining title, play, and actions', async () => {
+    const user = userEvent.setup();
+    renderTrackTable({});
+
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    expect(screen.getByRole('checkbox', { name: 'Title' })).toBeDisabled();
+    await user.click(screen.getByRole('checkbox', { name: 'Artist' }));
+
+    expect(renderedColumnLabels()).toEqual(['Play', 'Title', 'Album', 'Length', 'Actions']);
+    expect(screen.getByRole('button', { name: /^Sort by Title/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Play Zulu' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Actions' })).toBeInTheDocument();
+  });
+
+  it('resets column changes to the active default preset', async () => {
+    const user = userEvent.setup();
+    renderTrackTable({});
+
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Artist' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Year' }));
+    expect(renderedColumnLabels()).toEqual(['Play', 'Title', 'Album', 'Year', 'Length', 'Actions']);
+
+    await user.click(screen.getByRole('button', { name: 'Reset columns' }));
+    expect(renderedColumnLabels()).toEqual([
+      'Play',
+      'Title',
+      'Artist',
+      'Album',
+      'Length',
+      'Actions',
+    ]);
+  });
+
+  it('keeps a column choice when the table is reopened during the session', async () => {
+    const user = userEvent.setup();
+    const first = renderTrackTable({});
+
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Year' }));
+    first.unmount();
+
+    renderTrackTable({});
+    expect(screen.getByRole('columnheader', { name: 'Year' })).toBeInTheDocument();
   });
 
   it('sorts stably and hands playback the displayed order and clicked index', async () => {
@@ -154,6 +272,8 @@ function renderTrackTable({
   sort,
   manualSorting,
   onSortChange,
+  visibleColumns,
+  onVisibleColumnsChange,
   tableTracks = tracks,
 }: {
   detailed?: boolean;
@@ -161,6 +281,8 @@ function renderTrackTable({
   sort?: TrackTableSort;
   manualSorting?: boolean;
   onSortChange?: (sort: TrackTableSort) => void;
+  visibleColumns?: readonly TrackTableColumnId[];
+  onVisibleColumnsChange?: (columns: TrackTableColumnId[]) => void;
   tableTracks?: Song[];
 }) {
   const client = new QueryClient({
@@ -176,10 +298,24 @@ function renderTrackTable({
           sort={sort}
           manualSorting={manualSorting}
           onSortChange={onSortChange}
+          visibleColumns={visibleColumns}
+          onVisibleColumnsChange={onVisibleColumnsChange}
         />
       </QueryClientProvider>
     </MemoryRouter>,
   );
+}
+
+function renderedColumnLabels(): string[] {
+  return [...screen.getByRole('table').querySelectorAll('thead th')].map((header) => {
+    const structuralLabel = header.getAttribute('aria-label');
+    if (structuralLabel) return structuralLabel;
+    return (
+      header.querySelector<HTMLSpanElement>('.track-sort-button > span:first-child')?.textContent ??
+      header.textContent?.trim() ??
+      ''
+    );
+  });
 }
 
 function renderedTitles(): string[] {
