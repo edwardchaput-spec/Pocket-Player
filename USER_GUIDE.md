@@ -1,5 +1,7 @@
 # Pocket Player user guide
 
+This guide covers the current Windows source build. The Android adaptive interface is a technical preview: credentials remain session-only and device lifecycle, packaging, and distribution are still under validation.
+
 ## Starting Pocket Player
 
 - Double-click **Pocket Player** on the Windows Desktop after the shortcut has been installed.

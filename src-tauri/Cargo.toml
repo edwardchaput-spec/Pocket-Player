@@ -1,8 +1,11 @@
 [package]
 name = "navidrome-desktop"
 version = "0.1.0"
-description = "Pocket Player — A Navidrome Revolution"
-authors = ["Pocket Player contributors"]
+description = "A security-conscious Navidrome client with reliable playback and explainable discovery"
+authors = ["Edward Chaput de Saintonge"]
+license = "MIT"
+repository = "https://github.com/edwardchaput-spec/Pocket-Player"
+publish = false
 edition = "2024"
 
 [lib]
