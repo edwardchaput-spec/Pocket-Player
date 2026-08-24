@@ -2,6 +2,8 @@
 
 Pocket Player is built and run directly on Windows. It connects to an existing Navidrome server; no Docker, VM, LXC, remote SSH host, or server-side component is used.
 
+This guide documents the reproducible Windows workflow. Android currently has an adaptive technical-preview implementation, but its SDK setup, device matrix, signing, lifecycle checks, and Keystore-backed credential persistence are not yet a supported release workflow.
+
 ## Windows prerequisites
 
 This repository currently uses Tauri 2.11.x and requires:
@@ -83,6 +85,12 @@ The shortcut launches `src-tauri\target\release\navidrome-desktop.exe` directly,
 
 The settings file must never contain a password, Subsonic token/salt, authenticated upstream URL, API key, or loopback session token.
 
+## Licensing and distribution
+
+Pocket Player's original code is licensed under the root [MIT License](LICENSE). Third-party components retain their own terms; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+Before distributing any binary, generate and review a target-specific dependency notice bundle from `package-lock.json` and `src-tauri/Cargo.lock`, include all required third-party texts and attributions, and archive the report with the release revision. The configured Tauri bundles include the Pocket Player licence metadata, but that does not replace the third-party review.
+
 ## Library index and migrations
 
 The Rust backend downloads the searchable track catalogue in bounded 500-track pages, stores it transactionally in SQLite, and builds a compact in-memory search string over useful text tags. Track queries sort and filter the full result set before returning a page to React. Refresh the index from Tracks after a Navidrome scan or bulk retag.
@@ -93,7 +101,7 @@ SQLite schema changes are applied through the `schema_migrations` table. Add a f
 
 Automated tests use local mock HTTP servers and do not require a real account. Exercise this checklist manually with credentials entered only into the running app:
 
-1. Run `npm.cmd run verify`, then `npm.cmd run tauri build`, locally on Windows.
+1. Run `npm.cmd run verify`, complete the third-party licence review, then run `npm.cmd run tauri build` locally on Windows.
 2. Run `npm.cmd run tauri dev` and connect with credentials entered only in the app.
 3. Confirm Home sections, full search, albums, artists, tracks, genres, favourites, and playlists show real data.
 4. Open an album and start a middle track. Navigate throughout the app and confirm the persistent player continues.

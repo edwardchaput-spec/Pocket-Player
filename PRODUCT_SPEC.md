@@ -4,18 +4,18 @@
 
 - Product name: **Pocket Player**
 - Tagline: **A Navidrome Revolution**
-- Product type: Windows-first desktop music client
+- Product type: local music client for Windows and Android
 - Primary server: the user's existing Navidrome instance
 - Development location: a normal local folder on the Windows desktop, opened directly in Cursor
-- Deployment model: installed and run on the desktop; no application service is deployed to Proxmox or the home server
+- Deployment model: installed and run on a Windows PC or Android device; no application service is deployed to Proxmox or the home server
 - API target: Navidrome's supported Subsonic/OpenSubsonic-compatible REST API
-- Initial release scope: one Windows user, one configured Navidrome profile, online streaming
+- Initial release scope: one user, one configured Navidrome profile, online streaming on Windows and Android
 
-Pocket Player and “A Navidrome Revolution” are the product’s public name and tagline. The existing package identifier remains stable so upgrades retain local settings and Windows credentials.
+Pocket Player and “A Navidrome Revolution” are the product’s public name and tagline. The existing package identifier remains stable so upgrades retain platform-appropriate local settings and credentials.
 
 ## 1. Product summary
 
-Pocket Player is a native-feeling Windows music application that connects to an existing Navidrome server and presents the user's personal music library without occupying a browser window.
+Pocket Player is a native-feeling Windows and Android music application that connects to an existing Navidrome server and presents the user's personal music library without occupying a browser window.
 
 It should combine:
 
@@ -27,7 +27,7 @@ It should combine:
 - Real-time audio visualisations.
 - A transparent and adjustable mix engine that can balance familiar music with discovery.
 
-Navidrome remains the source of truth for users, media metadata, favourites, ratings, playlists, play counts, and server-side permissions. The desktop application may maintain a local cache and local playback-event history to improve responsiveness and power client-only recommendations, but it must not become a second media server.
+Navidrome remains the source of truth for users, media metadata, favourites, ratings, playlists, play counts, and server-side permissions. The application may maintain a local cache and local playback-event history to improve responsiveness and power client-only recommendations, but it must not become a second media server.
 
 ## 2. Problem statement
 
@@ -39,7 +39,7 @@ The product should make starting and controlling music feel as convenient as a d
 
 ### 3.1 Primary goals
 
-1. Provide a dependable Windows desktop front end for Navidrome.
+1. Provide a dependable Windows and Android front end for Navidrome.
 2. Remove the need to keep a browser window open for normal listening.
 3. Make the current track and essential controls available in a compact mini player.
 4. Surface useful personal sections such as most played, recently added, recently played, favourites, and track mix.
@@ -66,7 +66,7 @@ The initial product is not intended to:
 - Use Navidrome's undocumented private web API where a supported Subsonic/OpenSubsonic endpoint exists.
 - Edit tags in the underlying music files.
 - Upload, move, rename, or delete media files.
-- Provide a mobile application.
+- Provide an iOS application in the first release.
 - Provide a public multi-tenant SaaS product.
 - Implement offline downloads in the first release.
 - Execute untrusted third-party visualiser code in the first release.
@@ -85,6 +85,7 @@ The initial product is not intended to:
 ### 5.2 Runtime
 
 - Windows 10 or Windows 11, with Windows 11 as the primary visual target.
+- Android 7.0 (API 24) or newer, with the current Pixel phone as the primary compact-screen target.
 - An existing reachable Navidrome server.
 - HTTPS is expected for normal use, especially away from the home LAN.
 - The user signs in with a normal Navidrome account.
@@ -100,7 +101,7 @@ The initial product is not intended to:
    - Navidrome password.
    - Whether the login should be remembered.
 4. The app validates the connection with the supported API.
-5. On success, the password is stored in Windows Credential Manager when "Remember me" is enabled. It is never stored in localStorage, a JSON settings file, logs, source code, or SQLite.
+5. On Windows, the password is stored in Windows Credential Manager when "Remember me" is enabled. Android keeps it only in process memory until a Keystore-backed persistent strategy is implemented. It is never stored in localStorage, a JSON settings file, logs, source code, or SQLite.
 6. The app loads the home screen with real library data.
 7. The user opens an album and starts a track.
 8. A persistent bottom player displays the current track and controls.
@@ -120,10 +121,10 @@ The main application shell should expose the following destinations:
 - **Tags**
 - **Playlists**
 - **Now Playing / Queue**
-- **Statistics** (later phase)
+- **Statistics** (based on playback observed by this installation)
 - **Settings**
 
-The persistent player remains visible at the bottom of the main window whenever a track is loaded. The navigation layout should adapt cleanly between a wide desktop window and a narrow compact window.
+The persistent player remains visible at the bottom whenever a track is loaded. Navigation follows current adaptive window-size classes: compact widths below 600 CSS pixels use five primary bottom destinations (Home, Search, Library, Playlists, and More), medium widths use a navigation rail, and expanded widths use the full desktop sidebar. Secondary library and playback destinations remain available through the Library and More hubs. System-bar and display-cutout safe areas must never obscure app controls.
 
 ## 8. Functional requirements
 
@@ -138,7 +139,7 @@ The application must:
 - Generate a fresh random salt for each server request.
 - Never send the clear-text password as a query parameter.
 - Keep the password on the Rust side after login whenever possible.
-- Store remembered credentials in Windows Credential Manager.
+- Store remembered credentials in Windows Credential Manager. Keep Android credentials session-only until a Keystore-backed credential strategy is available.
 - Allow the user to test the connection again from Settings.
 - Provide a clear logout action that deletes the saved credential and local session data.
 - Distinguish invalid credentials, permission failures, unreachable host, DNS failure, TLS failure, timeout, and incompatible API responses.
@@ -310,7 +311,7 @@ There must never be a second independent audio element in the mini player. One p
 
 ### 8.12 System tray and Windows integration
 
-Later MVP phases must add:
+The Windows experience includes:
 
 - System-tray icon.
 - Show/hide main window.
@@ -357,7 +358,7 @@ Requirements:
 
 ### 8.15 Settings
 
-Settings should eventually include:
+Settings scope includes current and planned controls:
 
 - Server profile and connection test.
 - Logout.
@@ -447,7 +448,7 @@ Potential statistics include:
 - Longest listening session.
 - Time-of-day listening patterns.
 
-The application must clearly label statistics that are based only on plays observed by this desktop client. It must not claim to represent all listening across every device unless the server exposes complete history through a supported API.
+The application must clearly label statistics that are based only on plays observed by this installed client. It must not claim to represent all listening across every device unless the server exposes complete history through a supported API.
 
 ## 11. Data ownership and synchronisation
 
@@ -489,7 +490,7 @@ The interface should feel like a dedicated music application rather than an admi
 Principles:
 
 - Artwork-led but not visually noisy.
-- Dark-first design with a later light option.
+- Dark-first design with dark, light, and system-following options.
 - Strong hierarchy and generous spacing.
 - Compact, information-rich track rows.
 - Consistent right-click and overflow menus.
@@ -511,10 +512,12 @@ Principles:
 - Seek and volume controls expose accessible values.
 - Queue reordering has a keyboard alternative.
 - Mini-player controls remain usable at Windows display scaling above 100 percent.
+- Compact controls provide at least a 48-by-48 CSS-pixel touch target.
+- Portrait and landscape layouts preserve feature parity without controls being obscured by system bars, display cutouts, or gesture navigation.
 
 ## 14. Performance requirements
 
-Targets for a normal desktop and a large personal library:
+Targets for a normal desktop or current Android device and a large personal library:
 
 - Application shell visible within 2 seconds after process start, excluding a cold Windows security scan.
 - Previously cached home data visible quickly while a background refresh runs.
@@ -528,7 +531,7 @@ Targets for a normal desktop and a large personal library:
 
 ## 15. Security and privacy requirements
 
-- Password stored only in Windows Credential Manager when remembered.
+- Remembered passwords are stored only in Windows Credential Manager on Windows. Android passwords remain process-memory-only until a Keystore-backed strategy is implemented.
 - No secret in localStorage, sessionStorage, source, environment files committed to Git, plain settings files, logs, crash reports, or analytics.
 - Navidrome requests are created by the Rust backend.
 - Authenticated Navidrome URLs are not exposed to the webview or copied to logs.
@@ -604,6 +607,7 @@ Targets for a normal desktop and a large personal library:
 ### Phase 6 - Distribution and maintenance
 
 - Signed installer strategy.
+- Signed Android App Bundle and Play Console release workflow.
 - Updater.
 - Migration tests.
 - Release notes and diagnostics export.
@@ -613,25 +617,27 @@ Targets for a normal desktop and a large personal library:
 
 The MVP is ready for daily personal use when:
 
-1. It installs and launches on the user's Windows desktop.
+1. It installs and launches on the user's Windows desktop or supported Android device.
 2. It connects to the existing Navidrome server using a normal Navidrome account.
-3. It remembers the login securely without storing a plaintext password in application files.
+3. It remembers the login securely where platform storage is implemented and never stores a plaintext password in application files; Android remains explicitly session-only until then.
 4. It presents real library data for home, search, albums, artists, tracks, and playlists.
 5. It streams a full album without the UI losing playback state.
 6. Play, pause, previous, next, seek, volume, shuffle, repeat, and queue controls work consistently.
 7. Favourites and playlist changes survive refresh and are reflected in Navidrome.
 8. Scrobbling updates play count exactly once per qualifying play.
-9. The main window can be hidden while playback continues.
-10. The mini player controls the same playback session.
+9. On Windows, the main window can be hidden while playback continues.
+10. On Windows, the mini player controls the same playback session.
 11. A restart restores the local queue and current item.
 12. Common errors are understandable and do not expose secrets.
 13. `npm test`, frontend type checking, Rust tests, Clippy, and a release build all pass.
+14. On compact Android widths, primary navigation is a five-destination bottom bar and no desktop sidebar is shown.
+15. Android content and controls remain clear of status bars, display cutouts, gesture navigation, and the on-screen keyboard.
 
 ## 19. Open product decisions
 
 These decisions should be made after the first vertical slice, based on hands-on testing:
 
-- Final product name and visual identity.
+- Whether Pocket Player and the current visual identity remain unchanged for broader public distribution.
 - Whether the long-term playback backend remains Web Audio/HTML media or moves to MPV.
 - Exact Windows media-session implementation.
 - Whether local statistics should import any server history if a supported endpoint becomes available.

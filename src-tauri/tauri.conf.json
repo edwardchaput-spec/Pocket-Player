@@ -28,6 +28,10 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "msi"],
+    "publisher": "Edward Chaput de Saintonge",
+    "copyright": "Copyright (c) 2026 Edward Chaput de Saintonge",
+    "license": "MIT",
+    "licenseFile": "../LICENSE",
     "icon": ["icons/icon.ico"]
   }
 }

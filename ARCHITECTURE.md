@@ -2,28 +2,28 @@
 
 ## Document status
 
-- Scope: architecture for a Windows-first Navidrome desktop client
+- Scope: architecture for a local Windows and Android Navidrome client
 - Development model: local Cursor project on the Windows desktop
 - Runtime model: local installed application connecting to an existing Navidrome server
 - Architecture style: Tauri 2 application with a React/TypeScript webview and a Rust backend
 - Initial server protocol: supported Subsonic/OpenSubsonic-compatible REST endpoints exposed by Navidrome
-- Working package identifier: `com.burtonsvilla.navidrome-desktop`
-- Subsonic client identifier: `burtonsvilla-desktop`
+- Stable package identifier: `com.burtonsvilla.navidrome-desktop`
+- Internal Subsonic client identifier: `burtonsvilla-desktop`
 
-The package identifier and client identifier are working values. Rename them once a permanent product name is selected, before distributing builds broadly.
+The existing package identifier is retained so upgrades preserve local settings and credentials. Publisher identity, public release naming, and long-term version policy remain owner decisions before broad distribution.
 
 ## 1. Architectural decision summary
 
-The application will be built and run locally on Windows. It will not run in a container, LXC, VM, or service on the home server.
+The application will be built locally on Windows and run as an installed Windows or Android app. It will not run in a container, LXC, VM, or service on the home server.
 
 Navidrome remains the remote server and source of truth. The desktop application consists of:
 
-1. A React and TypeScript user interface rendered by Windows WebView2 through Tauri.
+1. A React and TypeScript user interface rendered by Windows WebView2 or Android System WebView through Tauri.
 2. A Rust backend embedded in the same installed application.
 3. A Rust Navidrome client that performs authenticated API requests.
-4. Windows Credential Manager storage for the remembered Navidrome password.
+4. A platform credential strategy: Windows Credential Manager on Windows and process-memory-only credentials on Android until Keystore-backed persistence is implemented.
 5. A loopback-only Rust media proxy for artwork and audio streaming.
-6. Local non-secret settings and, in later phases, a local SQLite cache and listening-event database.
+6. Local non-secret settings, a SQLite metadata cache, and a listening-event database.
 
 The frontend must not call Navidrome directly. It invokes a small, typed set of Tauri commands. This avoids browser CORS problems, centralises authentication and redaction, and prevents reusable Navidrome authentication parameters from being exposed in the DOM or JavaScript logs.
 
@@ -31,17 +31,17 @@ The frontend must not call Navidrome directly. It invokes a small, typed set of 
 
 ```mermaid
 flowchart LR
-    U[Windows user] --> UI[React UI in Tauri WebView2]
+    U[Local user] --> UI[React UI in Tauri webview]
     UI -->|Tauri IPC commands| R[Rust application core]
     R -->|HTTPS Subsonic/OpenSubsonic API| N[Existing Navidrome server]
-    R -->|read/write secret| C[Windows Credential Manager]
+    R -->|platform credential strategy| C[Windows Credential Manager or Android process memory]
     R -->|non-secret settings| S[Tauri app data directory]
-    R -->|later cache and events| D[Local SQLite database]
+    R -->|cache and local events| D[Local SQLite database]
     UI -->|audio and artwork requests| P[Loopback media proxy]
     P -->|authenticated upstream request| N
 ```
 
-There is no new remote backend between the desktop application and Navidrome.
+There is no new remote backend between the installed application and Navidrome.
 
 ## 3. Deployment model
 
@@ -55,18 +55,18 @@ C:\Users\<user>\Projects\navidrome-desktop
 
 Cursor opens this folder directly. Development commands run in the local Windows terminal integrated with Cursor.
 
-Do not develop this project through Remote SSH to a Proxmox container. Do not create a Docker Compose stack for it. The build requires access to the local Windows toolchain because Tauri produces a Windows executable and installer.
+Do not develop this project through Remote SSH to a Proxmox container. Do not create a Docker Compose stack for it. The build requires access to the local Windows toolchain for Windows packages and to the local Android SDK/NDK/JDK toolchain for Android packages.
 
 ### 3.2 Installed application
 
 A production build contains:
 
-- The compiled Rust/Tauri executable.
+- The compiled Rust/Tauri application for the target platform.
 - Bundled frontend assets.
 - Required icons and resources.
-- An NSIS or MSI installer produced by Tauri.
+- An NSIS/MSI installer for Windows or an APK/AAB package for Android.
 
-At runtime, the app stores only local user-specific data in the Tauri application directories and Windows Credential Manager.
+At runtime, the app stores only local user-specific non-secret data in Tauri application directories. Remembered passwords use Windows Credential Manager on Windows; the Android implementation currently keeps the password in process memory and does not persist it.
 
 ### 3.3 Home-server impact
 
@@ -74,7 +74,7 @@ No home-server change is part of the application build.
 
 The existing Navidrome address only needs to:
 
-- Be reachable from the desktop.
+- Be reachable from the device.
 - Present a valid TLS certificate for HTTPS use.
 - Pass `/rest/*` requests to Navidrome.
 - Permit normal audio streaming and HTTP range requests through the reverse proxy.
@@ -88,7 +88,7 @@ If a reverse proxy later adds a separate login page, forward-auth layer, or exte
 
 | Layer | Choice | Reason |
 |---|---|---|
-| Desktop shell | Tauri 2 | Small native package, Rust backend, Windows window/tray APIs |
+| Application shell | Tauri 2 | Shared Rust core and webview UI with Windows and Android packaging |
 | Frontend | React + TypeScript + Vite | Mature UI ecosystem and strong Cursor support |
 | Server-state fetching | TanStack Query | Caching, retries, cancellation, stale data, invalidation |
 | Client state | Zustand | Small predictable store for queue, playback, and UI state |
@@ -99,9 +99,9 @@ If a reverse proxy later adds a separate login page, forward-auth layer, or exte
 | Rust errors | `thiserror` | Structured internal error types |
 | Hashing and IDs | `sha2`, protocol-required MD5, and `uuid` | Stable profile IDs, Subsonic auth, playback sessions |
 | Logging | `tracing` with explicit redaction | Structured diagnostics without secret leakage |
-| Credential storage | Rust keyring ecosystem using Windows native store | Password remains in Windows Credential Manager |
+| Credential storage | Platform strategy owned by Rust | Windows uses Credential Manager; Android remains session-only until Keystore-backed persistence is added |
 | Non-secret settings | Official Tauri Store plugin | Small persistent settings with Tauri path handling |
-| Local database, later | SQLite owned by Rust | Cached metadata, local queue snapshots, playback events, migrations |
+| Local database | SQLite owned by Rust | Cached metadata, local queue snapshots, playback events, migrations |
 | Tests | Vitest, React Testing Library, Rust unit/integration tests | Fast feedback across both halves of the app |
 
 ### 4.2 Version policy
@@ -119,11 +119,11 @@ The main trust boundaries are:
 1. **User to local UI**: user enters server URL, username, and password.
 2. **Webview to Rust**: only declared Tauri commands are allowed.
 3. **Rust to Navidrome**: all remote input is untrusted and must be parsed defensively.
-4. **Rust to Windows Credential Manager**: password is stored under the current Windows account.
+4. **Rust to platform credential strategy**: Windows may persist the password under the current account; Android currently holds it only in process memory.
 5. **Webview to loopback proxy**: only a per-process token and permitted media identifiers are accepted.
 6. **Local files**: settings and databases are untrusted on read and require schema validation/migration.
 
-A compromise of the user's Windows account is outside the app's protection boundary, but the app should still avoid making credential theft easier through plaintext files or logs.
+A compromise of the user's operating-system account or unlocked device is outside the app's protection boundary, but the app should still avoid making credential theft easier through plaintext files or logs.
 
 ## 6. High-level component model
 
@@ -186,7 +186,7 @@ sequenceDiagram
     actor User
     participant UI as React login screen
     participant Rust as Rust profile service
-    participant Keyring as Windows Credential Manager
+    participant Creds as Platform credential strategy
     participant ND as Navidrome
 
     User->>UI: Enter server URL, username, password
@@ -196,7 +196,7 @@ sequenceDiagram
     Rust->>ND: GET /rest/ping.view with token auth
     ND-->>Rust: JSON success or structured error
     alt Valid login
-        Rust->>Keyring: Save password when remember=true
+        Rust->>Creds: Save password when supported and requested
         Rust->>Rust: Save non-secret profile settings
         Rust-->>UI: Sanitised profile and server capabilities
         UI->>UI: Clear password from component state
@@ -208,7 +208,7 @@ sequenceDiagram
 
 ### 7.3 Credential storage
 
-Use a Windows-native credential entry through Rust.
+Use a Rust-owned platform credential strategy. Windows uses a native Credential Manager entry. Android uses a process-memory-only implementation and forces `remember_credential` off until a separately reviewed Keystore-backed implementation is available.
 
 Recommended coordinates:
 
@@ -249,7 +249,7 @@ The password must not be serialised with the profile.
 At startup:
 
 1. Load the current non-secret profile.
-2. If it is marked remembered, request its secret from Credential Manager.
+2. If it is marked remembered, request its secret from the platform credential strategy. Only Windows profiles can currently be marked remembered.
 3. Run a bounded `ping` request.
 4. If successful, enter the application.
 5. If the password is missing or invalid, show the login screen with server URL and username prefilled but no password.
@@ -309,9 +309,9 @@ fetch_any_navidrome_url(url, query, headers)
 - Never log the final authenticated URL.
 - For diagnostics, log only method name, endpoint name, duration, HTTP status, and a request correlation ID.
 
-### 8.3 Initial endpoint allowlist
+### 8.3 Endpoint allowlist
 
-Milestone 1 needs:
+The initial vertical slice used:
 
 - `ping`
 - `getOpenSubsonicExtensions`, where available without authentication
@@ -322,7 +322,7 @@ Milestone 1 needs:
 - `stream`
 - `scrobble`
 
-Later phases add:
+The current library client also uses:
 
 - `search3`
 - `getArtists`
@@ -1085,11 +1085,11 @@ npm run tauri build
 
 ## 21. Architecture decisions and trade-offs
 
-### ADR-001: Local desktop app, not server-hosted web app
+### ADR-001: Local installed app, not server-hosted web app
 
-**Decision:** Build and run on Windows through Tauri.
+**Decision:** Build and run locally on Windows and Android through Tauri.
 
-**Reason:** The requested mini player, tray, global controls, and browser-free experience are desktop concerns. Navidrome already provides the remote server.
+**Reason:** Playback, platform integration, and a browser-free experience belong in an installed client. Navidrome already provides the remote server.
 
 ### ADR-002: Rust owns Navidrome networking
 
@@ -1097,11 +1097,11 @@ npm run tauri build
 
 **Reason:** Centralises auth, prevents credential URL exposure, avoids CORS dependence, and enables a safe media proxy.
 
-### ADR-003: Windows Credential Manager stores remembered password
+### ADR-003: Rust owns platform credential storage
 
-**Decision:** Use the native per-user credential store.
+**Decision:** Use Windows Credential Manager for remembered Windows passwords and a session-only in-memory store on Android until Keystore-backed persistence is implemented.
 
-**Reason:** Better user experience and security than plaintext settings or requiring a separate vault password.
+**Reason:** Secrets must never fall back to plaintext settings merely to make a platform port work.
 
 ### ADR-004: Loopback media proxy
 
@@ -1142,6 +1142,12 @@ npm run tauri build
 **Decision:** Use built-in Canvas 2D scenes and first-party WebGL 2 shaders over the shared analyser, with no downloaded preset code.
 
 **Reason:** Delivers particle and GPU effects without expanding the audio, credential, or third-party code trust boundary. See `docs/decisions/ADR-009-trusted-hybrid-visualizer-engine.md`.
+
+### ADR-010: Android uses an adaptive application shell
+
+**Decision:** Compact widths use a five-destination bottom bar, medium widths a navigation rail, and expanded widths the desktop sidebar. All variants share the same routes and playback owner.
+
+**Reason:** This follows Android adaptive navigation and edge-to-edge conventions without creating a second frontend or playback lifecycle. See `docs/decisions/ADR-010-android-adaptive-shell.md`.
 
 ## 22. Milestone map
 

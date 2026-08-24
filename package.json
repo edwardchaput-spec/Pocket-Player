@@ -2,6 +2,13 @@
   "name": "navidrome-desktop",
   "private": true,
   "version": "0.1.0",
+  "description": "A security-conscious Navidrome client with reliable playback and explainable discovery",
+  "author": "Edward Chaput de Saintonge",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edwardchaput-spec/Pocket-Player.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",
