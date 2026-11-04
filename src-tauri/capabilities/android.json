@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/mobile-schema.json",
+  "identifier": "android-playback",
+  "description": "Native Media3 playback output used only by the Android main window",
+  "platforms": ["android"],
+  "windows": ["main"],
+  "permissions": ["pocket-playback:default"]
+}

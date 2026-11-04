@@ -37,7 +37,7 @@ describe('custom theme colours', () => {
     expect(style.getPropertyValue('--accent')).toBe('#ff3366');
     expect(style.getPropertyValue('--accent-strong')).toMatch(/^#[0-9a-f]{6}$/);
     expect(style.getPropertyValue('--bg')).toBe('#080b12');
-    expect(style.getPropertyValue('--text')).toBe('#f3f4f8');
+    expect(style.getPropertyValue('--text')).toBe('#f0e8da');
     expect(style.getPropertyValue('--text-muted')).toMatch(/^#[0-9a-f]{6}$/);
     expect(style.getPropertyValue('color-scheme')).toBe('dark');
     expect(style.getPropertyValue('--surface')).toBe('#141927');
@@ -62,7 +62,7 @@ describe('custom theme colours', () => {
       surface: null,
     });
 
-    expect(style.getPropertyValue('--text')).toBe('#171820');
+    expect(style.getPropertyValue('--text')).toBe('#221c15');
     expect(style.getPropertyValue('color-scheme')).toBe('light');
   });
 });

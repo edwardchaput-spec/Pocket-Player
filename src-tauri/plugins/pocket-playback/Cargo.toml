@@ -1,0 +1,15 @@
+[package]
+name = "tauri-plugin-pocket-playback"
+version = "0.1.0"
+description = "Android Media3 playback output, media session, and Android Auto browse tree for Pocket Player"
+authors = ["Edward Chaput de Saintonge"]
+license = "MIT"
+edition = "2024"
+publish = false
+links = "tauri-plugin-pocket-playback"
+
+[dependencies]
+tauri = { version = "2.11.1" }
+
+[build-dependencies]
+tauri-plugin = { version = "2.6.3", features = ["build"] }

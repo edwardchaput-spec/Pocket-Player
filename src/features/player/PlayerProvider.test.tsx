@@ -29,6 +29,25 @@ vi.mock('../../lib/tauri/playback', () => ({
   syncPlayQueue: vi.fn(() => Promise.resolve()),
 }));
 
+const nativeMocks = vi.hoisted(() => {
+  const ok = () => vi.fn((...args: unknown[]) => Promise.resolve(args.length));
+  return {
+    configureNativePlayback: ok(),
+    subscribeNativePlayback: ok(),
+    setNativeQueue: ok(),
+    nativePlay: ok(),
+    nativePause: ok(),
+    nativeStop: ok(),
+    nativeSeekTo: ok(),
+    nativeSkipTo: ok(),
+    nativeSetVolume: ok(),
+    nativeSetRepeatMode: ok(),
+    nativeSetSpectrumEnabled: ok(),
+  };
+});
+
+vi.mock('../../lib/tauri/nativePlayback', () => nativeMocks);
+
 vi.mock('../../lib/tauri/desktop', () => ({
   currentDesktopWindow: vi.fn(() => ({
     hide: vi.fn(() => Promise.resolve()),
@@ -205,6 +224,38 @@ describe('PlayerProvider startup playback', () => {
     act(() => resolveListener?.(desktopMocks.desktopUnlisten));
 
     await waitFor(() => expect(desktopMocks.desktopUnlisten).toHaveBeenCalledOnce());
+  });
+});
+
+describe('PlayerProvider on Android', () => {
+  it('uses the native Media3 output instead of an audio element', async () => {
+    const queue = replaceQueue(songsFixture, 0);
+    const session: Session = {
+      ...sessionFixture,
+      platform: 'android',
+      queueSnapshot: {
+        ...queue,
+        unshuffledOccurrenceIds: null,
+        position: 7,
+        repeatMode: 'off',
+        shuffleMode: false,
+      },
+    };
+    const { container } = renderPlayer(session);
+
+    expect(container.querySelector('audio')).toBeNull();
+    await waitFor(() => expect(nativeMocks.setNativeQueue).toHaveBeenCalled());
+    expect(nativeMocks.configureNativePlayback).toHaveBeenCalledWith(sessionFixture.proxyBaseUrl);
+    expect(nativeMocks.setNativeQueue.mock.calls[0]![0]).toMatchObject({
+      startIndex: 0,
+      positionMs: 7000,
+      playWhenReady: false,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
+    expect(nativeMocks.nativePlay).toHaveBeenCalled();
+    expect(playSpy).not.toHaveBeenCalled();
+    expect(showTrackNotification).not.toHaveBeenCalled();
   });
 });
 

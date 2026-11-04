@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDate } from '../../lib/format';
 import { logout, testConnection } from '../../lib/tauri/auth';
 import { clearLocalLibraryData, exportDiagnostics } from '../../lib/tauri/playback';
-import { getPlaylists } from '../../lib/tauri/library';
+import { getLibraryIndexStatus, getPlaylists, refreshLibraryIndex } from '../../lib/tauri/library';
 import { AppError, HomeSection, Session } from '../../lib/tauri/types';
 import { usePlaybackStore } from '../player/playbackStore';
 import { getThemeColorDefaults, isStrictHexColor } from './themeColors';
@@ -14,6 +14,7 @@ export function SettingsPage({ session, onLogout }: { session: Session; onLogout
   const [testing, setTesting] = useState(false);
   const [clearingData, setClearingData] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [resyncing, setResyncing] = useState(false);
   const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const queryClient = useQueryClient();
   const player = usePlaybackStore();
@@ -23,6 +24,10 @@ export function SettingsPage({ session, onLogout }: { session: Session; onLogout
   const playlists = useQuery({
     queryKey: ['profile', profile.profileId, 'playlists'],
     queryFn: getPlaylists,
+  });
+  const indexStatus = useQuery({
+    queryKey: ['profile', profile.profileId, 'settings-index-status'],
+    queryFn: getLibraryIndexStatus,
   });
 
   const homeOptions: Array<[HomeSection, string]> = [
@@ -68,7 +73,7 @@ export function SettingsPage({ session, onLogout }: { session: Session; onLogout
   };
 
   const disconnect = async () => {
-    if (!window.confirm('Log out and remove this app’s remembered Windows credential?')) return;
+    if (!window.confirm('Log out and remove this app’s remembered credential?')) return;
     setMessage(null);
     try {
       await logout();
@@ -97,6 +102,24 @@ export function SettingsPage({ session, onLogout }: { session: Session; onLogout
       setMessage({ kind: 'error', text: (cause as AppError).message });
     } finally {
       setClearingData(false);
+    }
+  };
+
+  /** Rebuilds the local index from Navidrome, then refetches every cached view. */
+  const resync = async () => {
+    setResyncing(true);
+    setMessage(null);
+    try {
+      const status = await refreshLibraryIndex();
+      await queryClient.invalidateQueries();
+      setMessage({
+        kind: 'success',
+        text: `Resynced with the server: ${status.trackCount.toLocaleString()} tracks.`,
+      });
+    } catch (cause) {
+      setMessage({ kind: 'error', text: (cause as AppError).message });
+    } finally {
+      setResyncing(false);
     }
   };
 
@@ -137,6 +160,14 @@ export function SettingsPage({ session, onLogout }: { session: Session; onLogout
             <dd>{formatDate(profile.lastSuccessfulConnection)}</dd>
           </div>
           <div>
+            <dt>Library last synced</dt>
+            <dd>
+              {indexStatus.data?.refreshedAt
+                ? `${formatDate(indexStatus.data.refreshedAt)} · ${indexStatus.data.trackCount.toLocaleString()} tracks`
+                : 'Not synced yet'}
+            </dd>
+          </div>
+          <div>
             <dt>Server type</dt>
             <dd>{profile.server.serverType ?? 'Not reported'}</dd>
           </div>
@@ -166,6 +197,15 @@ export function SettingsPage({ session, onLogout }: { session: Session; onLogout
           </p>
         )}
         <div className="button-row">
+          <button
+            className="primary-button"
+            type="button"
+            disabled={resyncing}
+            aria-busy={resyncing}
+            onClick={() => void resync()}
+          >
+            {resyncing ? 'Resyncing…' : 'Resync with server'}
+          </button>
           <button
             className="secondary-button"
             type="button"
@@ -208,7 +248,7 @@ export function SettingsPage({ session, onLogout }: { session: Session; onLogout
             >
               <option value="dark">Dark</option>
               <option value="light">Light</option>
-              <option value="system">Follow Windows</option>
+              <option value="system">Follow system</option>
             </select>
           </label>
           <label>

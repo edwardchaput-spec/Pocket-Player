@@ -25,6 +25,9 @@ pub struct SessionView {
     pub proxy_base_url: String,
     pub player_settings: PlayerSettings,
     pub queue_snapshot: Option<QueueSnapshot>,
+    /// Target OS (`windows`, `android`, ...) so the webview can select the
+    /// playback output without user-agent sniffing.
+    pub platform: &'static str,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -33,6 +36,22 @@ pub struct StartupView {
     pub session: Option<SessionView>,
     pub saved_profile: Option<SafeProfile>,
     pub restoration_error: Option<AppError>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformInfo {
+    pub platform: &'static str,
+    /// False on Android, where passwords are kept in process memory only.
+    pub persistent_credentials: bool,
+}
+
+#[tauri::command]
+pub fn platform_info(state: State<'_, AppState>) -> PlatformInfo {
+    PlatformInfo {
+        platform: std::env::consts::OS,
+        persistent_credentials: state.credentials.is_persistent(),
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -79,7 +98,17 @@ pub async fn restore_session<R: Runtime>(
             restoration_error: None,
         });
     }
-    let Some(password) = state.credentials.get(&profile.profile_id).await? else {
+    let stored = match state.credentials.get(&profile.profile_id).await {
+        Ok(value) => value,
+        Err(error) => {
+            return Ok(StartupView {
+                session: None,
+                saved_profile: Some(profile),
+                restoration_error: Some(error),
+            });
+        }
+    };
+    let Some(password) = stored else {
         return Ok(StartupView {
             session: None,
             saved_profile: Some(profile),
@@ -117,6 +146,7 @@ pub async fn restore_session<R: Runtime>(
                     proxy_base_url: state.proxy_base_url.clone(),
                     player_settings,
                     queue_snapshot: persistence::load_queue_snapshot(&app),
+                    platform: std::env::consts::OS,
                 }),
                 saved_profile: None,
                 restoration_error: None,
@@ -144,6 +174,8 @@ pub async fn login<R: Runtime>(
     if input.password.is_empty() {
         return Err(AppError::invalid_input("Enter a Navidrome password."));
     }
+    // Never report a remembered login on platforms without a persistent store.
+    input.remember_credential &= state.credentials.is_persistent();
     let password = Zeroizing::new(std::mem::take(&mut input.password));
     let client = NavidromeClient::new(normalized.url.clone(), username.clone(), password.clone())?;
     let mut server = client.ping().await?;
@@ -184,6 +216,7 @@ pub async fn login<R: Runtime>(
         proxy_base_url: state.proxy_base_url.clone(),
         player_settings: persistence::load_player_settings(&app),
         queue_snapshot: persistence::load_queue_snapshot(&app),
+        platform: std::env::consts::OS,
     })
 }
 

@@ -78,3 +78,19 @@ async function fillForm() {
   await userEvent.type(screen.getByLabelText('Username'), 'alice');
   await userEvent.type(screen.getByLabelText('Password'), 'temporary-password');
 }
+
+it('replaces the remember option with a session-only note where passwords cannot persist', async () => {
+  const loginAction = vi.fn(() => Promise.resolve(sessionFixture));
+  render(
+    <LoginScreen
+      savedProfile={null}
+      onConnected={vi.fn()}
+      loginAction={loginAction}
+      platformInfoAction={() =>
+        Promise.resolve({ platform: 'android', persistentCredentials: false })
+      }
+    />,
+  );
+  expect(await screen.findByText(/kept only while the app is running/)).toBeInTheDocument();
+  expect(screen.queryByRole('checkbox', { name: /Credential Manager/ })).toBeNull();
+});

@@ -1,13 +1,14 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useState } from 'react';
 
 import { BrandMark } from '../../components/BrandMark';
-import { login } from '../../lib/tauri/auth';
+import { getPlatformInfo, login } from '../../lib/tauri/auth';
 import { AppError, Profile } from '../../lib/tauri/types';
 
 interface LoginScreenProps {
   savedProfile: Profile | null;
   initialError?: AppError | null;
   loginAction?: typeof login;
+  platformInfoAction?: typeof getPlatformInfo;
   onConnected: Awaited<ReturnType<typeof login>> extends infer Session
     ? (session: Session) => void
     : never;
@@ -25,7 +26,21 @@ export function LoginScreen({
   initialError,
   onConnected,
   loginAction = login,
+  platformInfoAction = getPlatformInfo,
 }: LoginScreenProps) {
+  // Windows can remember passwords in Credential Manager; Android cannot yet.
+  const [persistentCredentials, setPersistentCredentials] = useState(true);
+  useEffect(() => {
+    let active = true;
+    platformInfoAction()
+      .then((info) => {
+        if (active) setPersistentCredentials(info.persistentCredentials);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [platformInfoAction]);
   const [fields, setFields] = useState<Fields>({
     serverUrl: savedProfile?.serverUrl ?? '',
     username: savedProfile?.username ?? '',
@@ -51,7 +66,11 @@ export function LoginScreen({
     setError(null);
     let clearPassword = true;
     try {
-      const session = await loginAction({ ...fields, allowPrivateHttp });
+      const session = await loginAction({
+        ...fields,
+        rememberCredential: fields.rememberCredential && persistentCredentials,
+        allowPrivateHttp,
+      });
       onConnected(session);
     } catch (cause) {
       const appError = cause as AppError;
@@ -82,7 +101,8 @@ export function LoginScreen({
         <h1 id="login-title">A Navidrome Revolution</h1>
         <h2>Connect to Navidrome</h2>
         <p className="muted">
-          Credentials stay in the Windows app and are never sent to this webview after login.
+          Your password stays in the app’s native core and is never sent to this webview after
+          login.
         </p>
 
         <form onSubmit={submit} noValidate>
@@ -129,17 +149,24 @@ export function LoginScreen({
             </button>
           </div>
 
-          <label className="checkbox-row">
-            <input
-              type="checkbox"
-              checked={fields.rememberCredential}
-              disabled={busy}
-              onChange={(event) =>
-                setFields({ ...fields, rememberCredential: event.target.checked })
-              }
-            />
-            Remember login in Windows Credential Manager
-          </label>
+          {persistentCredentials ? (
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                checked={fields.rememberCredential}
+                disabled={busy}
+                onChange={(event) =>
+                  setFields({ ...fields, rememberCredential: event.target.checked })
+                }
+              />
+              Remember login in Windows Credential Manager
+            </label>
+          ) : (
+            <p className="muted">
+              On this device your password is kept only while the app is running, so you will sign
+              in again after a restart.
+            </p>
+          )}
 
           {error && (
             <div className="message error-message" role="alert">

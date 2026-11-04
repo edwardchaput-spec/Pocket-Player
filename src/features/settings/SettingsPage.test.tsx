@@ -5,6 +5,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 import { sessionFixture } from '../../test/fixtures';
 import { usePlaybackStore } from '../player/playbackStore';
+import { getPlaylists, refreshLibraryIndex } from '../../lib/tauri/library';
 import { SettingsPage } from './SettingsPage';
 
 vi.mock('../../lib/tauri/auth', () => ({
@@ -14,6 +15,12 @@ vi.mock('../../lib/tauri/auth', () => ({
 
 vi.mock('../../lib/tauri/library', () => ({
   getPlaylists: vi.fn(() => Promise.resolve([])),
+  getLibraryIndexStatus: vi.fn(() =>
+    Promise.resolve({ ready: true, trackCount: 1200, refreshedAt: '2026-11-01T10:00:00Z' }),
+  ),
+  refreshLibraryIndex: vi.fn(() =>
+    Promise.resolve({ ready: true, trackCount: 1234, refreshedAt: '2026-11-04T16:30:00Z' }),
+  ),
 }));
 
 vi.mock('../../lib/tauri/playback', () => ({
@@ -47,6 +54,18 @@ it('layers custom colours over the selected theme and resets them together', asy
     surface: null,
   });
   expect(reset).toBeDisabled();
+});
+
+it('resyncs the library index and refetches cached server data', async () => {
+  renderSettings();
+  expect(await screen.findByText(/1,200 tracks/)).toBeInTheDocument();
+  const callsBefore = vi.mocked(getPlaylists).mock.calls.length;
+
+  await userEvent.click(screen.getByRole('button', { name: 'Resync with server' }));
+
+  expect(await screen.findByText('Resynced with the server: 1,234 tracks.')).toBeInTheDocument();
+  expect(refreshLibraryIndex).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(getPlaylists).mock.calls.length).toBeGreaterThan(callsBefore);
 });
 
 function renderSettings() {

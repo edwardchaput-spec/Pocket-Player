@@ -1,4 +1,7 @@
+#[cfg(target_os = "android")]
+mod android_tls;
 mod app_state;
+mod auto_catalog;
 mod commands;
 mod credentials;
 pub mod error;
@@ -15,14 +18,15 @@ mod scrobble;
 use std::sync::Arc;
 
 use app_state::AppState;
-use credentials::WindowsCredentialStore;
 use local_data::LocalDatabase;
 use media_proxy::SharedClient;
+#[cfg(desktop)]
 use tauri::{
-    Emitter, Manager, RunEvent,
+    Emitter,
     menu::{Menu, MenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
 };
+use tauri::{Manager, RunEvent};
 use tokio::sync::RwLock;
 use tracing_subscriber::EnvFilter;
 
@@ -34,29 +38,36 @@ pub fn run() {
         .compact()
         .try_init();
 
-    let app = tauri::Builder::default()
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            show_main_window(app);
-        }))
+    let builder = tauri::Builder::default();
+    #[cfg(desktop)]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        show_main_window(app);
+    }));
+    let app = builder
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_pocket_playback::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .setup(|app| {
+            #[cfg(target_os = "android")]
+            android_tls::initialize();
             let active_client: SharedClient = Arc::new(RwLock::new(None));
             let proxy = tauri::async_runtime::block_on(media_proxy::start(active_client.clone()))?;
             let database = Arc::new(LocalDatabase::open(
                 app.path().app_data_dir()?.join("library.sqlite3"),
             )?);
             app.manage(AppState::new(
-                WindowsCredentialStore::new(),
+                credentials::platform_store(),
                 active_client,
                 proxy,
                 database,
             ));
+            #[cfg(desktop)]
             build_tray(app)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::restore_session,
+            commands::platform_info,
             commands::login,
             commands::newest_albums,
             commands::album_list,
@@ -103,6 +114,7 @@ pub fn run() {
     });
 }
 
+#[cfg(desktop)]
 fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let show = MenuItem::with_id(app, "show", "Show Pocket Player", true, None::<&str>)?;
     let mini = MenuItem::with_id(app, "mini", "Open Mini Player", true, None::<&str>)?;
@@ -151,6 +163,7 @@ fn build_tray(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[cfg(desktop)]
 fn show_main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();

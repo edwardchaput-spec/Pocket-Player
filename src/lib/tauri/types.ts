@@ -419,6 +419,8 @@ export const sessionSchema = z.object({
   proxyBaseUrl: z.string().url(),
   playerSettings: playerSettingsSchema,
   queueSnapshot: queueSnapshotSchema.nullable().optional(),
+  /** Rust target OS; selects the Android native playback output. */
+  platform: z.string().default('windows'),
 });
 export type Session = z.infer<typeof sessionSchema>;
 
