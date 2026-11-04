@@ -1,13 +1,20 @@
-import { PropsWithChildren, useCallback, useEffect, useRef, useState } from 'react';
+import { PropsWithChildren, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
+import { savePlayerSettings, saveQueueSnapshot, syncPlayQueue } from '../../lib/tauri/playback';
 import {
-  recordPlaybackEvent,
-  reportScrobble,
-  savePlayerSettings,
-  saveQueueSnapshot,
-  syncPlayQueue,
-} from '../../lib/tauri/playback';
+  configureNativePlayback,
+  nativePause,
+  nativePlay,
+  nativeSeekTo,
+  nativeSetRepeatMode,
+  nativeSetSpectrumEnabled,
+  nativeSetVolume,
+  nativeSkipTo,
+  nativeStop,
+  setNativeQueue,
+  subscribeNativePlayback,
+} from '../../lib/tauri/nativePlayback';
 import { Session } from '../../lib/tauri/types';
 import { AlbumLink, ArtistLink } from '../../components/LibraryLinks';
 import {
@@ -20,6 +27,9 @@ import {
 import { currentQueueItem, type PlaybackStatus, usePlaybackStore } from './playbackStore';
 import { ScrobbleController } from './ScrobbleController';
 import { AudioAnalysisProvider } from './AudioAnalysisContext';
+import { type AudioAnalyserSource, NativeSpectrumAnalyser } from './nativeAnalyser';
+import { NativePlaybackSync } from './nativePlaybackSync';
+import { createTrackReporter, finishTrackReporter, recordTrackError } from './trackReporter';
 import { applyCustomThemeColors } from '../settings/themeColors';
 import { QueuePopover } from '../queue/QueuePopover';
 
@@ -31,9 +41,73 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
   const audioContextRef = useRef<AudioContext | null>(null);
   const audioSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const notifiedPlaybackSessionRef = useRef<string | null>(null);
-  const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
+  const [webAnalyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const state = usePlaybackStore();
   const current = currentQueueItem(state);
+  // ADR-011: on Android the native Media3 service is the only audio output.
+  const nativeOutput = session.platform === 'android';
+  const [nativeAnalyser] = useState(() => (nativeOutput ? new NativeSpectrumAnalyser() : null));
+  const analyser: AudioAnalyserSource | null = nativeAnalyser ?? webAnalyser;
+  const nativeSyncRef = useRef<NativePlaybackSync | null>(null);
+
+  useEffect(() => {
+    if (!nativeOutput || !nativeAnalyser) return;
+    let disposed = false;
+    const sync = new NativePlaybackSync({
+      api: {
+        setQueue: setNativeQueue,
+        skipTo: nativeSkipTo,
+        play: nativePlay,
+        pause: nativePause,
+        stop: nativeStop,
+        seekTo: nativeSeekTo,
+        setVolume: nativeSetVolume,
+        setRepeatMode: nativeSetRepeatMode,
+        setSpectrumEnabled: nativeSetSpectrumEnabled,
+      },
+      store: usePlaybackStore,
+      proxyBaseUrl: session.proxyBaseUrl,
+      profileId: session.profile.profileId,
+      analyser: nativeAnalyser,
+    });
+    nativeSyncRef.current = sync;
+    void configureNativePlayback(session.proxyBaseUrl)
+      .then(() => subscribeNativePlayback((event) => sync.handleNativeEvent(event)))
+      .then(() => {
+        if (!disposed) sync.start();
+      })
+      .catch(() =>
+        usePlaybackStore.getState().setError('Native playback could not start on this device.'),
+      );
+    const demand = window.setInterval(() => sync.updateSpectrumDemand(), 1000);
+    return () => {
+      disposed = true;
+      window.clearInterval(demand);
+      sync.dispose();
+      nativeSyncRef.current = null;
+    };
+  }, [nativeAnalyser, nativeOutput, session.proxyBaseUrl, session.profile.profileId]);
+
+  const transport = useMemo<PlaybackTransport>(
+    () => ({
+      play: () => {
+        if (nativeSyncRef.current) return nativeSyncRef.current.transport.play();
+        if (audioRef.current) playAudio(audioRef.current, usePlaybackStore.getState());
+      },
+      pause: () => {
+        if (nativeSyncRef.current) return nativeSyncRef.current.transport.pause();
+        pauseAudio(audioRef.current, usePlaybackStore.getState());
+      },
+      seek: (seconds) => {
+        if (nativeSyncRef.current) return nativeSyncRef.current.transport.seek(seconds);
+        const audio = audioRef.current;
+        if (!audio) return;
+        audio.currentTime = seconds;
+        usePlaybackStore.getState().setTiming(seconds, audio.duration || 0);
+      },
+    }),
+    [],
+  );
 
   useEffect(() => {
     state.initializeSettings(session.playerSettings);
@@ -49,25 +123,10 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
     if (!audio) return;
     audio.crossOrigin = 'anonymous';
     const reporter = current
-      ? new ScrobbleController(
-          (submission) =>
-            reportScrobble({
-              playbackSessionId: current.playbackSessionId,
-              trackId: current.track.id,
-              submission,
-            }),
-          (submission, listenedSeconds) => {
-            void recordPlaybackEvent({
-              eventId: crypto.randomUUID(),
-              profileId: session.profile.profileId,
-              playbackSessionId: current.playbackSessionId,
-              trackId: current.track.id,
-              eventType: submission ? 'completed' : 'now_playing',
-              position: audioRef.current?.currentTime ?? 0,
-              listenedMs: Math.round(listenedSeconds * 1000),
-              sourceContext: 'queue',
-            }).catch(() => undefined);
-          },
+      ? createTrackReporter(
+          current,
+          session.profile.profileId,
+          () => audioRef.current?.currentTime ?? 0,
         )
       : null;
     reporterRef.current = reporter;
@@ -90,18 +149,14 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
       state.setStatus('paused');
     }
     return () => {
-      reporter?.stopped(performance.now());
-      if (reporter && reporter.listened() >= 5 && !reporter.isCompletedOrPending()) {
-        void recordPlaybackEvent({
-          eventId: crypto.randomUUID(),
-          profileId: session.profile.profileId,
-          playbackSessionId: current.playbackSessionId,
-          trackId: current.track.id,
-          eventType: 'skipped',
-          position: audio.currentTime || 0,
-          listenedMs: Math.round(reporter.listened() * 1000),
-          sourceContext: 'queue',
-        }).catch(() => undefined);
+      if (reporter) {
+        finishTrackReporter(
+          reporter,
+          current,
+          session.profile.profileId,
+          audio.currentTime || 0,
+          performance.now(),
+        );
       }
     };
     // Store actions are stable and the current occurrence is the source boundary.
@@ -110,9 +165,10 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
-    audio.volume = state.volume;
-    audio.muted = state.muted;
+    if (audio) {
+      audio.volume = state.volume;
+      audio.muted = state.muted;
+    }
     const timer = window.setTimeout(() => {
       void savePlayerSettings({
         volume: state.volume,
@@ -185,17 +241,16 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
       } else if (control.action === 'next') {
         playback.next('manual');
       } else if (control.action === 'play-pause') {
-        if (isPlaybackActive(playback.status)) pauseAudio(audio, playback);
-        else if (audio) playAudio(audio, playback);
-      } else if (control.action === 'play' && audio?.paused) {
-        playAudio(audio, playback);
+        if (isPlaybackActive(playback.status)) transport.pause();
+        else transport.play();
+      } else if (control.action === 'play' && !isPlaybackActive(playback.status)) {
+        transport.play();
       } else if (control.action === 'pause') {
-        pauseAudio(audio, playback);
-      } else if (control.action === 'seek' && audio && control.value != null) {
-        const knownDuration = Number.isFinite(audio.duration) ? audio.duration : playback.duration;
-        const position = Math.max(0, Math.min(control.value, knownDuration || control.value));
-        audio.currentTime = position;
-        playback.setTiming(position, knownDuration || 0);
+        transport.pause();
+      } else if (control.action === 'seek' && control.value != null) {
+        const knownDuration =
+          audio && Number.isFinite(audio.duration) ? audio.duration : playback.duration;
+        transport.seek(Math.max(0, Math.min(control.value, knownDuration || control.value)));
       } else if (control.action === 'volume' && control.value != null) {
         playback.setVolume(control.value);
       } else if (control.action === 'mute' && control.muted != null) {
@@ -214,7 +269,7 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
       disposed = true;
       unlisten?.();
     };
-  }, [navigate, session.proxyBaseUrl]);
+  }, [navigate, session.proxyBaseUrl, transport]);
 
   useEffect(() => {
     void publishPlaybackState(session.proxyBaseUrl);
@@ -253,7 +308,8 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
   }, []);
 
   useEffect(() => {
-    if (!current) {
+    // Android shows the native media notification instead.
+    if (!current || nativeOutput) {
       notifiedPlaybackSessionRef.current = null;
       return;
     }
@@ -268,10 +324,11 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
         [current.track.artist, current.track.album].filter(Boolean).join(' · '),
       ).catch(() => undefined);
     }
-  }, [current, state.notifications, state.status]);
+  }, [current, nativeOutput, state.notifications, state.status]);
 
   useEffect(() => {
-    if (!current) return;
+    // The native Media3 session owns lock-screen metadata on Android.
+    if (!current || nativeOutput) return;
     if ('mediaSession' in navigator && typeof MediaMetadata !== 'undefined') {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: current.track.title,
@@ -287,10 +344,10 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
           : [],
       });
     }
-  }, [current, session.proxyBaseUrl]);
+  }, [current, nativeOutput, session.proxyBaseUrl]);
 
   useEffect(() => {
-    if (!('mediaSession' in navigator)) return;
+    if (nativeOutput || !('mediaSession' in navigator)) return;
     const audio = () => audioRef.current;
     const handlers: Array<[MediaSessionAction, MediaSessionActionHandler]> = [
       ['play', () => void audio()?.play()],
@@ -320,7 +377,7 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
         }
       }
     };
-  }, []);
+  }, [nativeOutput]);
 
   useEffect(
     () => () => {
@@ -362,92 +419,97 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
   return (
     <AudioAnalysisProvider analyser={analyser}>
       {children}
-      <audio
-        ref={audioRef}
-        crossOrigin="anonymous"
-        onLoadStart={() => {
-          const playback = usePlaybackStore.getState();
-          if (playback.status !== 'paused') playback.setStatus('loading');
-        }}
-        onPlaying={() => {
-          const audio = audioRef.current;
-          if (audio && !audioContextRef.current && typeof window.AudioContext !== 'undefined') {
-            try {
-              const context = new AudioContext();
-              const source = context.createMediaElementSource(audio);
-              const nextAnalyser = context.createAnalyser();
-              nextAnalyser.fftSize = 2048;
-              nextAnalyser.smoothingTimeConstant = 0.78;
-              source.connect(nextAnalyser);
-              nextAnalyser.connect(context.destination);
-              audioContextRef.current = context;
-              audioSourceRef.current = source;
-              setAnalyser(nextAnalyser);
-            } catch {
-              // Playback remains functional if Web Audio is unavailable.
+      {!nativeOutput && (
+        <audio
+          ref={audioRef}
+          crossOrigin="anonymous"
+          onLoadStart={() => {
+            const playback = usePlaybackStore.getState();
+            if (playback.status !== 'paused') playback.setStatus('loading');
+          }}
+          onPlaying={() => {
+            const audio = audioRef.current;
+            if (audio && !audioContextRef.current && typeof window.AudioContext !== 'undefined') {
+              try {
+                const context = new AudioContext();
+                const source = context.createMediaElementSource(audio);
+                const nextAnalyser = context.createAnalyser();
+                nextAnalyser.fftSize = 2048;
+                nextAnalyser.smoothingTimeConstant = 0.78;
+                source.connect(nextAnalyser);
+                nextAnalyser.connect(context.destination);
+                audioContextRef.current = context;
+                audioSourceRef.current = source;
+                setAnalyser(nextAnalyser);
+              } catch {
+                // Playback remains functional if Web Audio is unavailable.
+              }
             }
+            void audioContextRef.current?.resume();
+            reporterRef.current?.playing(performance.now());
+            state.setStatus('playing');
+          }}
+          onPause={() => {
+            reporterRef.current?.stopped(performance.now());
+            if (!audioRef.current?.ended) state.setStatus('paused');
+          }}
+          onWaiting={() => {
+            reporterRef.current?.stopped(performance.now());
+            state.setStatus('stalled');
+          }}
+          onSeeking={() => reporterRef.current?.stopped(performance.now())}
+          onSeeked={() => {
+            if (!audioRef.current?.paused) reporterRef.current?.playing(performance.now());
+          }}
+          onTimeUpdate={(event) =>
+            state.setTiming(event.currentTarget.currentTime, event.currentTarget.duration || 0)
           }
-          void audioContextRef.current?.resume();
-          reporterRef.current?.playing(performance.now());
-          state.setStatus('playing');
-        }}
-        onPause={() => {
-          reporterRef.current?.stopped(performance.now());
-          if (!audioRef.current?.ended) state.setStatus('paused');
-        }}
-        onWaiting={() => {
-          reporterRef.current?.stopped(performance.now());
-          state.setStatus('stalled');
-        }}
-        onSeeking={() => reporterRef.current?.stopped(performance.now())}
-        onSeeked={() => {
-          if (!audioRef.current?.paused) reporterRef.current?.playing(performance.now());
-        }}
-        onTimeUpdate={(event) =>
-          state.setTiming(event.currentTarget.currentTime, event.currentTarget.duration || 0)
-        }
-        onDurationChange={(event) =>
-          state.setTiming(event.currentTarget.currentTime, event.currentTarget.duration || 0)
-        }
-        onLoadedMetadata={(event) => {
-          const position = pendingSeekRef.current;
-          if (position > 0 && position < event.currentTarget.duration - 1) {
-            event.currentTarget.currentTime = position;
+          onDurationChange={(event) =>
+            state.setTiming(event.currentTarget.currentTime, event.currentTarget.duration || 0)
           }
-          pendingSeekRef.current = 0;
-        }}
-        onEnded={() => {
-          const audio = audioRef.current;
-          reporterRef.current?.stopped(performance.now());
-          reporterRef.current?.sample(performance.now(), audio?.duration ?? 0);
-          state.next('ended');
-        }}
-        onError={() => {
-          reporterRef.current?.stopped(performance.now());
-          if (current) {
-            void recordPlaybackEvent({
-              eventId: crypto.randomUUID(),
-              profileId: session.profile.profileId,
-              playbackSessionId: current.playbackSessionId,
-              trackId: current.track.id,
-              eventType: 'error',
-              position: audioRef.current?.currentTime ?? 0,
-              listenedMs: Math.round((reporterRef.current?.listened() ?? 0) * 1000),
-              sourceContext: 'queue',
-            }).catch(() => undefined);
-          }
-          state.setError(
-            'This track could not be streamed. Try another track or test the connection.',
-          );
-        }}
-      />
-      <PlayerBar audioRef={audioRef} proxyBaseUrl={session.proxyBaseUrl} />
+          onLoadedMetadata={(event) => {
+            const position = pendingSeekRef.current;
+            if (position > 0 && position < event.currentTarget.duration - 1) {
+              event.currentTarget.currentTime = position;
+            }
+            pendingSeekRef.current = 0;
+          }}
+          onEnded={() => {
+            const audio = audioRef.current;
+            reporterRef.current?.stopped(performance.now());
+            reporterRef.current?.sample(performance.now(), audio?.duration ?? 0);
+            state.next('ended');
+          }}
+          onError={() => {
+            reporterRef.current?.stopped(performance.now());
+            if (current) {
+              recordTrackError(
+                reporterRef.current,
+                current,
+                session.profile.profileId,
+                audioRef.current?.currentTime ?? 0,
+              );
+            }
+            state.setError(
+              'This track could not be streamed. Try another track or test the connection.',
+            );
+          }}
+        />
+      )}
+      <PlayerBar transport={transport} proxyBaseUrl={session.proxyBaseUrl} />
     </AudioAnalysisProvider>
   );
 }
 
+/** Output-agnostic controls: HTML audio on Windows, native Media3 on Android. */
+interface PlaybackTransport {
+  play(): void;
+  pause(): void;
+  seek(seconds: number): void;
+}
+
 interface PlayerBarProps {
-  audioRef: React.RefObject<HTMLAudioElement | null>;
+  transport: PlaybackTransport;
   proxyBaseUrl: string;
 }
 
@@ -458,7 +520,7 @@ function PlayerBar(props: PlayerBarProps) {
   return hasCurrent ? <ActivePlayerBar {...props} /> : null;
 }
 
-function ActivePlayerBar({ audioRef, proxyBaseUrl }: PlayerBarProps) {
+function ActivePlayerBar({ transport, proxyBaseUrl }: PlayerBarProps) {
   const state = usePlaybackStore();
   const [queueOpen, setQueueOpen] = useState(false);
   const queueTriggerRef = useRef<HTMLButtonElement>(null);
@@ -511,12 +573,7 @@ function ActivePlayerBar({ audioRef, proxyBaseUrl }: PlayerBarProps) {
             type="button"
             className="play-toggle"
             aria-label={playbackActive ? 'Pause' : 'Play'}
-            onClick={() => {
-              const audio = audioRef.current;
-              if (!audio) return;
-              if (playbackActive) pauseAudio(audio, usePlaybackStore.getState());
-              else playAudio(audio, usePlaybackStore.getState());
-            }}
+            onClick={() => (playbackActive ? transport.pause() : transport.play())}
           >
             {playbackActive ? 'Ⅱ' : '▶'}
           </button>
@@ -541,9 +598,7 @@ function ActivePlayerBar({ audioRef, proxyBaseUrl }: PlayerBarProps) {
             max={Math.max(state.duration, 0)}
             step={0.1}
             value={Math.min(state.position, state.duration || 0)}
-            onChange={(event) => {
-              if (audioRef.current) audioRef.current.currentTime = Number(event.target.value);
-            }}
+            onChange={(event) => transport.seek(Number(event.target.value))}
           />
           <span>{formatClock(state.duration)}</span>
         </div>

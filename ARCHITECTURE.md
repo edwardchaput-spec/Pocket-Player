@@ -475,7 +475,7 @@ Do not disable CSP globally.
 
 ### 10.1 Initial engine
 
-The initial engine uses one HTML audio element owned by a top-level `PlayerProvider` in the main application window.
+The initial engine uses one HTML audio element owned by a top-level `PlayerProvider` in the main application window. On Android the audio output is instead the native Media3 service described in [ADR-011](docs/decisions/ADR-011-android-native-playback-and-android-auto.md); the queue stays in `PlayerProvider`.
 
 The main window is hidden rather than destroyed when close-to-tray is later enabled. Therefore the one audio element continues playing.
 

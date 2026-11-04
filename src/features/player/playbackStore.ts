@@ -26,7 +26,7 @@ import {
 export type PlaybackStatus =
   'idle' | 'loading' | 'playing' | 'paused' | 'stalled' | 'ended' | 'error';
 
-interface PlaybackState {
+export interface PlaybackState {
   queue: QueueItem[];
   currentIndex: number | null;
   status: PlaybackStatus;

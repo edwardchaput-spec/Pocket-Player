@@ -14,6 +14,7 @@ export const sessionFixture: Session = {
     },
   },
   proxyBaseUrl: 'http://127.0.0.1:45678/process-token',
+  platform: 'windows',
   playerSettings: {
     volume: 0.8,
     muted: false,

@@ -3,21 +3,22 @@ import type { CustomThemeColors, PlayerSettings } from '../../lib/tauri/types';
 type ThemeColorDefaults = Record<keyof CustomThemeColors, string>;
 
 const DARK_DEFAULTS: ThemeColorDefaults = {
-  accent: '#836dff',
-  background: '#0a0b10',
-  surface: '#12141b',
+  accent: '#e0783a',
+  background: '#15130f',
+  surface: '#1c1915',
 };
 
 const LIGHT_DEFAULTS: ThemeColorDefaults = {
-  accent: '#836dff',
-  background: '#f3f3f7',
-  surface: '#ffffff',
+  accent: '#b9561d',
+  background: '#f3ede2',
+  surface: '#fbf7f0',
 };
 
 const MANAGED_PROPERTIES = [
   '--accent',
   '--accent-strong',
   '--focus',
+  '--on-accent',
   '--bg',
   '--surface',
   '--surface-raised',
@@ -52,6 +53,7 @@ export function applyCustomThemeColors(
     style.setProperty('--accent', colors.accent);
     style.setProperty('--accent-strong', shiftForEmphasis(colors.accent, 0.28));
     style.setProperty('--focus', shiftForEmphasis(colors.accent, 0.38));
+    style.setProperty('--on-accent', readableTextColor(colors.accent));
   }
   if (colors.background && isStrictHexColor(colors.background)) {
     style.setProperty('--bg', colors.background);
@@ -60,7 +62,7 @@ export function applyCustomThemeColors(
     style.setProperty('--text-muted', readableMutedColor(colors.background, readableText));
     style.setProperty(
       'color-scheme',
-      readableText === '#171820' || readableText === '#000000' ? 'light' : 'dark',
+      readableText === '#221c15' || readableText === '#000000' ? 'light' : 'dark',
     );
   }
   if (colors.surface && isStrictHexColor(colors.surface)) {
@@ -119,7 +121,7 @@ function contrastRatio(first: string, second: string): number {
 }
 
 function readableTextColor(background: string): string {
-  const preferred = ['#171820', '#f3f4f8'] as const;
+  const preferred = ['#221c15', '#f0e8da'] as const;
   const preferredChoice =
     contrastRatio(background, preferred[0]) >= contrastRatio(background, preferred[1])
       ? preferred[0]

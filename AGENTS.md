@@ -5,7 +5,7 @@
 - Rust owns all Navidrome networking and credentials. The frontend uses only the typed Tauri facade under `src/lib/tauri`.
 - Never log or persist Navidrome secrets outside Windows Credential Manager. Keep authenticated upstream URLs out of the webview.
 - Treat every Navidrome ID as an opaque string.
-- There is exactly one playback owner and one HTML audio element.
+- There is exactly one playback owner (the playback store) and one audio output: the HTML audio element on Windows, the native Media3 service on Android (ADR-011).
 - Do not disable TLS validation, Tauri CSP, or other security controls.
 - Run `npm run verify` before declaring work complete.
 - Do not commit automatically; leave changes visible for review.

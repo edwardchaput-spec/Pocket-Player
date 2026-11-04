@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 
 import { BrandMark } from '../components/BrandMark';
+import { HubPage, LIBRARY_HUB_LINKS, MORE_HUB_LINKS } from './HubPage';
 import { Session } from '../lib/tauri/types';
 import { AlbumPage } from '../features/albums/AlbumPage';
 import { AlbumsPage } from '../features/albums/AlbumsPage';
@@ -38,6 +39,25 @@ const NAV_ITEMS = [
   { to: '/settings', label: 'Settings', glyph: '⌘' },
 ] as const;
 
+/** Compact-width primary destinations (ADR-010). */
+const BOTTOM_NAV_ITEMS = [
+  { to: '/home', label: 'Home', glyph: '◇', match: ['/home'] },
+  { to: '/search', label: 'Search', glyph: '⌕', match: ['/search'] },
+  {
+    to: '/library',
+    label: 'Library',
+    glyph: '▣',
+    match: ['/library', '/albums', '/artists', '/tracks', '/genres', '/tags'],
+  },
+  { to: '/playlists', label: 'Playlists', glyph: '≡', match: ['/playlists'] },
+  {
+    to: '/more',
+    label: 'More',
+    glyph: '⋯',
+    match: ['/more', '/now-playing', '/queue', '/mix', '/statistics', '/settings'],
+  },
+] as const;
+
 export function AppShell({ session, onLogout }: { session: Session; onLogout: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -72,6 +92,7 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
     event.preventDefault();
     showSearchResults(searchValue);
   };
+  const parent = parentRoute(location.pathname);
   let host = session.profile.serverUrl;
   try {
     host = new URL(session.profile.serverUrl).host;
@@ -111,6 +132,24 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
         </aside>
         <div className="route-content">
           <header className="workspace-header">
+            {parent && (
+              <button
+                type="button"
+                className="back-button"
+                aria-label={`Back to ${routeTitle(parent)}`}
+                title="Back"
+                onClick={() => {
+                  // Prefer real in-app history (genre -> album -> back to genre);
+                  // fall back to the collection parent on a fresh entry.
+                  if (location.key !== 'default') void navigate(-1);
+                  else void navigate(parent);
+                }}
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M15 5l-7 7 7 7" />
+                </svg>
+              </button>
+            )}
             <div className="workspace-context" aria-hidden="true">
               <span>Library</span>
               <strong>{routeTitle(location.pathname)}</strong>
@@ -169,6 +208,11 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
             <Route path="/playlists" element={<PlaylistsPage session={session} />} />
             <Route path="/playlists/:playlistId" element={<PlaylistPage session={session} />} />
             <Route path="/queue" element={<QueuePage />} />
+            <Route
+              path="/library"
+              element={<HubPage title="Library" links={LIBRARY_HUB_LINKS} />}
+            />
+            <Route path="/more" element={<HubPage title="More" links={MORE_HUB_LINKS} />} />
             <Route path="/now-playing" element={<NowPlayingPage session={session} />} />
             <Route path="/statistics" element={<StatisticsPage session={session} />} />
             <Route path="/mix" element={<MixPage session={session} />} />
@@ -179,9 +223,41 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
             <Route path="*" element={<Navigate to="/home" replace />} />
           </Routes>
         </div>
+        <nav className="bottom-nav" aria-label="Primary">
+          {BOTTOM_NAV_ITEMS.map((item) => {
+            const active = item.match.some(
+              (prefix) =>
+                location.pathname === prefix || location.pathname.startsWith(`${prefix}/`),
+            );
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={active ? 'active' : undefined}
+                aria-current={active ? 'page' : undefined}
+              >
+                <span className="nav-glyph" aria-hidden="true">
+                  {item.glyph}
+                </span>
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
       </div>
     </PlayerProvider>
   );
+}
+
+/** Collection parent for Up navigation; null on top-level destinations. */
+export function parentRoute(pathname: string): string | null {
+  const detail = /^\/(albums|artists|genres|tags|playlists)\/[^/]+/.exec(pathname);
+  if (detail) return `/${detail[1]}`;
+  if (['/albums', '/artists', '/tracks', '/genres', '/tags'].includes(pathname)) return '/library';
+  if (['/queue', '/now-playing', '/mix', '/statistics', '/settings'].includes(pathname)) {
+    return '/more';
+  }
+  return null;
 }
 
 function routeTitle(pathname: string): string {
@@ -200,6 +276,8 @@ function routeTitle(pathname: string): string {
     '/tags': 'Tags',
     '/playlists': 'Playlists',
     '/queue': 'Queue',
+    '/library': 'Library',
+    '/more': 'More',
     '/now-playing': 'Now Playing',
     '/statistics': 'Statistics',
     '/mix': 'Track Mix',

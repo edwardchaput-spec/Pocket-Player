@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, expect, it, vi } from 'vitest';
@@ -7,13 +7,15 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { getNewestAlbums, searchLibrary } from '../lib/tauri/library';
 import { sessionFixture, songsFixture } from '../test/fixtures';
 import { usePlaybackStore } from '../features/player/playbackStore';
-import { AppShell } from './AppShell';
+import { AppShell, parentRoute } from './AppShell';
 
 vi.mock('../lib/tauri/library', () => ({
   getNewestAlbums: vi.fn(),
   getAlbum: vi.fn(),
   getAlbumList: vi.fn(() => Promise.resolve([])),
   getPlaylists: vi.fn(() => Promise.resolve([])),
+  getLibraryIndexStatus: vi.fn(() => Promise.resolve({ ready: false, trackCount: 0 })),
+  refreshLibraryIndex: vi.fn(() => Promise.resolve({ ready: true, trackCount: 0 })),
   getStarred: vi.fn(() => Promise.resolve({ artists: [], albums: [], songs: [] })),
   searchLibrary: vi.fn(() => Promise.resolve({ artists: [], albums: [], songs: [] })),
 }));
@@ -164,3 +166,49 @@ function renderShell(initialEntry: string) {
     </QueryClientProvider>,
   );
 }
+
+it('offers five compact destinations and marks the Library hub active on library routes', async () => {
+  renderShell('/albums');
+
+  const primary = screen.getByRole('navigation', { name: 'Primary' });
+  const links = within(primary).getAllByRole('link');
+  expect(links.map((link) => link.textContent)).toEqual([
+    '◇Home',
+    '⌕Search',
+    '▣Library',
+    '≡Playlists',
+    '⋯More',
+  ]);
+  expect(within(primary).getByRole('link', { name: /Library/ })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+
+  await userEvent.click(within(primary).getByRole('link', { name: /More/ }));
+  expect(await screen.findByRole('heading', { name: 'More', level: 1 })).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /Settings.*Account/ })).toHaveAttribute(
+    'href',
+    '/settings',
+  );
+});
+
+it('maps drill-down screens to their collection parent', () => {
+  expect(parentRoute('/genres/Folk')).toBe('/genres');
+  expect(parentRoute('/albums/al%3A1')).toBe('/albums');
+  expect(parentRoute('/genres')).toBe('/library');
+  expect(parentRoute('/settings')).toBe('/more');
+  expect(parentRoute('/home')).toBeNull();
+  expect(parentRoute('/library')).toBeNull();
+});
+
+it('goes up to the parent hub on a fresh entry and back through history after drilling in', async () => {
+  renderShell('/queue');
+  expect(screen.queryByRole('button', { name: /^Back to/ })).toBeInTheDocument();
+  await userEvent.click(screen.getByRole('button', { name: 'Back to More' }));
+  expect(await screen.findByRole('heading', { name: 'More', level: 1 })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^Back to/ })).toBeNull();
+
+  await userEvent.click(screen.getByRole('link', { name: /Queue.*Reorder/ }));
+  await userEvent.click(screen.getByRole('button', { name: 'Back to More' }));
+  expect(await screen.findByRole('heading', { name: 'More', level: 1 })).toBeInTheDocument();
+});

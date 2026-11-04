@@ -13,7 +13,7 @@ use tokio::{
     sync::{RwLock, oneshot},
 };
 
-use crate::{error::AppError, navidrome::NavidromeClient};
+use crate::{auto_catalog, error::AppError, navidrome::NavidromeClient};
 
 const ALLOWED_ORIGINS: &[&str] = &[
     "http://localhost:1420",
@@ -72,6 +72,8 @@ pub async fn start(client: SharedClient) -> Result<ProxyHandle, std::io::Error> 
         .route("/{token}/health", get(health).head(health))
         .route("/{token}/stream/{id}", get(stream).head(stream))
         .route("/{token}/cover/{id}", get(cover).head(cover))
+        .route("/{token}/auto/children", get(auto_children))
+        .route("/{token}/auto/tracks", get(auto_tracks))
         .with_state(state);
     let (shutdown_sender, shutdown_receiver) = oneshot::channel();
     tauri::async_runtime::spawn(async move {
@@ -172,6 +174,78 @@ async fn cover(
     }
 }
 
+/// Android Auto browse tree. Reached only by the in-process Kotlin service;
+/// browser origins are refused outright.
+async fn auto_children(
+    State(state): State<ProxyState>,
+    Path(token): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+    headers: HeaderMap,
+) -> Response<Body> {
+    auto_json(state, token, query, headers, |client, node| async move {
+        auto_catalog::children(&client, &node)
+            .await
+            .map(|items| serde_json::json!({ "items": items }))
+    })
+    .await
+}
+
+async fn auto_tracks(
+    State(state): State<ProxyState>,
+    Path(token): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+    headers: HeaderMap,
+) -> Response<Body> {
+    auto_json(state, token, query, headers, |client, node| async move {
+        auto_catalog::tracks(&client, &node)
+            .await
+            .map(|songs| serde_json::json!({ "songs": songs }))
+    })
+    .await
+}
+
+async fn auto_json<F, Fut>(
+    state: ProxyState,
+    token: String,
+    query: HashMap<String, String>,
+    headers: HeaderMap,
+    load: F,
+) -> Response<Body>
+where
+    F: FnOnce(NavidromeClient, auto_catalog::Node) -> Fut,
+    Fut: std::future::Future<Output = Result<serde_json::Value, AppError>>,
+{
+    if !valid_token(&state, &token) || headers.contains_key(header::ORIGIN) {
+        return safe_error(StatusCode::NOT_FOUND, &HeaderMap::new());
+    }
+    if query.keys().any(|key| key != "node") {
+        return safe_error(StatusCode::BAD_REQUEST, &HeaderMap::new());
+    }
+    let Some(node) = query
+        .get("node")
+        .and_then(|raw| auto_catalog::parse_node(raw).ok())
+    else {
+        return safe_error(StatusCode::BAD_REQUEST, &HeaderMap::new());
+    };
+    let Some(client) = state.client.read().await.clone() else {
+        return safe_error(StatusCode::SERVICE_UNAVAILABLE, &HeaderMap::new());
+    };
+    match load(client, node).await {
+        Ok(value) => {
+            let mut response = Response::new(Body::from(value.to_string()));
+            response.headers_mut().insert(
+                header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            );
+            response
+                .headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            response
+        }
+        Err(error) => proxy_error(error, &HeaderMap::new()),
+    }
+}
+
 fn upstream_response(
     upstream: reqwest::Response,
     head: bool,
@@ -219,6 +293,12 @@ fn safe_error(status: StatusCode, request_headers: &HeaderMap) -> Response<Body>
 }
 
 fn with_cors(mut response: Response<Body>, request_headers: &HeaderMap) -> Response<Body> {
+    // Always vary on Origin: the same cover is fetched both by plain <img>
+    // (no Origin) and by the visualiser's CORS request. Without this, the
+    // webview reuses the cached non-CORS response and blocks the canvas load.
+    response
+        .headers_mut()
+        .insert(header::VARY, HeaderValue::from_static("Origin"));
     if let Some(origin) = request_headers
         .get(header::ORIGIN)
         .and_then(|value| value.to_str().ok())
@@ -228,9 +308,6 @@ fn with_cors(mut response: Response<Body>, request_headers: &HeaderMap) -> Respo
         response
             .headers_mut()
             .insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, origin);
-        response
-            .headers_mut()
-            .insert(header::VARY, HeaderValue::from_static("Origin"));
     }
     response
 }
@@ -277,6 +354,74 @@ mod tests {
         assert!(!valid_media_id(""));
         assert!(!valid_media_id("../secret"));
         assert!(!valid_media_id(&"a".repeat(513)));
+    }
+
+    #[tokio::test]
+    async fn auto_routes_refuse_browsers_bad_nodes_and_missing_sessions() {
+        let mut proxy = start(Arc::new(RwLock::new(None))).await.expect("proxy");
+        let http = reqwest::Client::new();
+        let get = |path: &str, origin: Option<&str>| {
+            let mut request = http.get(format!("{}{path}", proxy.base_url));
+            if let Some(origin) = origin {
+                request = request.header(header::ORIGIN, origin);
+            }
+            request.send()
+        };
+        let status = |path, origin| {
+            let response = get(path, origin);
+            async move { response.await.expect("response").status() }
+        };
+        assert_eq!(
+            status("/auto/children?node=root", Some("http://tauri.localhost")).await,
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            status("/auto/children?node=album:../x", None).await,
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status("/auto/tracks?node=root&extra=1", None).await,
+            StatusCode::BAD_REQUEST
+        );
+        assert_eq!(
+            status("/auto/children?node=root", None).await,
+            StatusCode::SERVICE_UNAVAILABLE
+        );
+        proxy.shutdown();
+    }
+
+    #[test]
+    fn cors_responses_always_vary_on_origin() {
+        let plain = with_cors(Response::new(Body::empty()), &HeaderMap::new());
+        assert_eq!(plain.headers()[header::VARY], "Origin");
+        assert!(
+            !plain
+                .headers()
+                .contains_key(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+        );
+
+        let mut request = HeaderMap::new();
+        request.insert(
+            header::ORIGIN,
+            HeaderValue::from_static("http://tauri.localhost"),
+        );
+        let cors = with_cors(Response::new(Body::empty()), &request);
+        assert_eq!(cors.headers()[header::VARY], "Origin");
+        assert_eq!(
+            cors.headers()[header::ACCESS_CONTROL_ALLOW_ORIGIN],
+            "http://tauri.localhost"
+        );
+
+        request.insert(
+            header::ORIGIN,
+            HeaderValue::from_static("https://evil.example"),
+        );
+        let refused = with_cors(Response::new(Body::empty()), &request);
+        assert!(
+            !refused
+                .headers()
+                .contains_key(header::ACCESS_CONTROL_ALLOW_ORIGIN)
+        );
     }
 
     #[test]

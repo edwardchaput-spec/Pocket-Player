@@ -23,7 +23,6 @@ chrono = { version = "0.4.41", features = ["serde"] }
 futures-util = "0.3.31"
 getrandom = "0.4.3"
 hex = "0.4.3"
-keyring = { version = "4.1.6", default-features = false, features = ["v1", "windows-native-keyring-store"] }
 md-5 = "0.11.0"
 reqwest = { version = "0.13.4", default-features = false, features = ["json", "rustls", "stream"] }
 rusqlite = { version = "0.40.1", features = ["bundled"] }
@@ -32,7 +31,7 @@ serde_json = "1.0.142"
 sha2 = "0.11.0"
 tauri = { version = "2.11.1", features = ["tray-icon"] }
 tauri-plugin-notification = "2"
-tauri-plugin-single-instance = "2"
+tauri-plugin-pocket-playback = { path = "plugins/pocket-playback" }
 tauri-plugin-store = "2.4.0"
 thiserror = "2.0.16"
 tokio = { version = "1.47.1", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
@@ -41,6 +40,20 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt"] }
 url = { version = "2.5.4", features = ["serde"] }
 uuid = { version = "1.18.0", features = ["serde", "v4"] }
 zeroize = { version = "1.8.1", features = ["derive"] }
+
+# Windows Credential Manager is the only persistent credential store; other
+# targets (Android) use a process-memory store until a Keystore design exists.
+[target.'cfg(windows)'.dependencies]
+keyring = { version = "4.1.6", default-features = false, features = ["v1", "windows-native-keyring-store"] }
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-single-instance = "2"
+
+# Android TLS: connect rustls-platform-verifier to the Android TrustManager.
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.22"
+rustls-platform-verifier = "0.7"
+tao = "0.35"
 
 [dev-dependencies]
 httpmock = "0.8.3"

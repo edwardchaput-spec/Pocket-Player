@@ -2,7 +2,7 @@
 
 Pocket Player is built and run directly on Windows. It connects to an existing Navidrome server; no Docker, VM, LXC, remote SSH host, or server-side component is used.
 
-This guide documents the reproducible Windows workflow. Android currently has an adaptive technical-preview implementation, but its SDK setup, device matrix, signing, lifecycle checks, and Keystore-backed credential persistence are not yet a supported release workflow.
+This guide documents the reproducible Windows workflow and the Android technical-preview build. Android device-matrix validation, signing, and Keystore-backed credential persistence are not yet a supported release workflow.
 
 ## Windows prerequisites
 
@@ -60,6 +60,55 @@ Use `npm.cmd` in place of `npm` for all commands if the PowerShell script shim i
 ```powershell
 npm.cmd run tauri dev
 ```
+
+## Android build (technical preview)
+
+Android uses the same frontend and Rust core. Audio goes through the native Media3 service in `src-tauri/plugins/pocket-playback` ([ADR-011](docs/decisions/ADR-011-android-native-playback-and-android-auto.md)). Prerequisites:
+
+- A JDK 17 or 21 for Gradle 8.14. Android Studio's bundled JBR is now JDK 25, which this Gradle cannot run; Android Studio can download a JBR 21 to `%USERPROFILE%\.jdks`.
+- The Android SDK with platform 36, and NDK 30.
+- The Rust `aarch64-linux-android` target (`tauri android init` installs all four Android targets).
+
+In PowerShell, set the toolchain variables for the session:
+
+```powershell
+$env:JAVA_HOME = "$env:USERPROFILE\.jdks\jbr-21.0.11"
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+$env:NDK_HOME = "$env:ANDROID_HOME\ndk\30.0.15729638"
+```
+
+Generate the Gradle project once. `src-tauri/gen/` is gitignored; all Android-specific code and manifest entries live in the plugin, so regenerating is safe:
+
+```powershell
+npx tauri android init --ci
+```
+
+Build a debug APK for 64-bit ARM phones:
+
+```powershell
+npx tauri android build --debug --target aarch64 --apk
+```
+
+Device checks to perform before calling an Android build validated:
+
+1. Playback continues with the screen off and the app in the background; the media notification and lock-screen controls work.
+2. Bluetooth headset buttons and unplugging headphones (playback pauses) behave correctly.
+3. Visualisers on Now Playing react to the music, and no spectrum traffic runs when they are off screen.
+4. Android Auto, checked with the Desktop Head Unit (`$env:ANDROID_HOME\extras\google\auto\desktop-head-unit.exe`) after enabling developer mode in the Android Auto app: the browse tree, search, track selection, and transport controls all work.
+5. HTTPS to the Navidrome server works on a release build. This exercises the Android certificate verifier and the cleartext rule that admits only `127.0.0.1`.
+
+Android passwords are session-only, so Android Auto has a library only while the app process has a signed-in session.
+
+### Testing Android Auto with the Desktop Head Unit
+
+Use a real phone; Android 10+ phones have Android Auto built in. Emulator images ship only an Android Auto stub, which needs a Play Store sign-in to replace. Steps verified on a Pixel 10 Pro (Android 17, Android Auto 17.9) with DHU 2.0:
+
+1. Install the DHU with the SDK manager. This SDK manager build uses slash-separated package paths: `sdkmanager --install "extras/google/auto"`.
+2. If Windows shows the phone's **ADB Interface** but `adb devices` does not list it, Windows has bound a generic driver. Restart adb with its built-in USB backend: `adb kill-server`, then `$env:ADB_LIBUSB = "1"; adb start-server`.
+3. A debug build signed on another machine cannot update an existing install (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). Uninstall the old copy first; this deletes its on-device data.
+4. On the phone: in Android Auto settings, tap **Version** ten times, then turn on **⋮ → Developer settings → Unknown sources**, so sideloaded builds appear. Then choose **⋮ → Start head unit server**.
+5. On the PC, run `adb forward tcp:5277 tcp:5277`, then start `desktop-head-unit.exe` **without flags**. `--usb=false` makes it search for a USB device whose serial is "false". When scripting, keep its stdin open, because it exits on end-of-input.
+6. If Android Auto crashes with `IllegalStateException: Already connected` (seen after a DHU session ends abruptly), run `adb shell am force-stop com.google.android.projection.gearhead`, then start the head unit server again on the phone.
 
 ## Desktop shortcut
 

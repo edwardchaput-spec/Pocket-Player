@@ -1,14 +1,16 @@
 import { createContext, PropsWithChildren, useContext } from 'react';
 
-const AudioAnalysisContext = createContext<AnalyserNode | null>(null);
+import type { AudioAnalyserSource } from './nativeAnalyser';
+
+const AudioAnalysisContext = createContext<AudioAnalyserSource | null>(null);
 
 export function AudioAnalysisProvider({
   analyser,
   children,
-}: PropsWithChildren<{ analyser: AnalyserNode | null }>) {
+}: PropsWithChildren<{ analyser: AudioAnalyserSource | null }>) {
   return <AudioAnalysisContext.Provider value={analyser}>{children}</AudioAnalysisContext.Provider>;
 }
 
-export function useAudioAnalyser(): AnalyserNode | null {
+export function useAudioAnalyser(): AudioAnalyserSource | null {
   return useContext(AudioAnalysisContext);
 }
