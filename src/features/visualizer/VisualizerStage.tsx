@@ -19,8 +19,13 @@ export function VisualizerStage({ session, track }: { session: Session; track: S
   const stageRef = useRef<HTMLElement>(null);
   const [browserOpen, setBrowserOpen] = useState(false);
   const [category, setCategory] = useState<'All' | VisualizerCategory>('All');
+  // Immersive: the stage covers the whole window and every other piece of
+  // chrome hides until a tap or an upward swipe reveals it.
   const [fullscreen, setFullscreen] = useState(false);
-  const [fullscreenError, setFullscreenError] = useState<string | null>(null);
+  const [chromeRevealed, setChromeRevealed] = useState(false);
+  const enteredDocumentFullscreen = useRef(false);
+  const gesture = useRef<{ x: number; y: number; id: number } | null>(null);
+  const activeTileRef = useRef<HTMLElement>(null);
   const [diagnostics, setDiagnostics] = useState<VisualizerDiagnostics | null>(null);
   const currentPreset = presetFor(player.visualizer);
   const artworkUrl = track.coverArt
@@ -50,30 +55,106 @@ export function VisualizerStage({ session, track }: { session: Session; track: S
     return () => window.clearInterval(timer);
   }, [move, player.visualizerAutoRotate, player.visualizerRotationSeconds]);
 
+  // Leaving full screen from the OS (Esc, back gesture) leaves immersive too.
   useEffect(() => {
     const onFullscreenChange = () => {
-      const active = document.fullscreenElement === stageRef.current;
-      setFullscreen(active);
-      if (!active) setBrowserOpen(false);
+      if (!document.fullscreenElement && enteredDocumentFullscreen.current) {
+        enteredDocumentFullscreen.current = false;
+        setFullscreen(false);
+      }
     };
     document.addEventListener('fullscreenchange', onFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
   }, []);
 
-  const toggleFullscreen = useCallback(async () => {
-    setFullscreenError(null);
-    try {
-      if (document.fullscreenElement === stageRef.current) await document.exitFullscreen();
-      else await stageRef.current?.requestFullscreen({ navigationUI: 'hide' });
-    } catch {
-      setFullscreenError('Windows or WebView2 did not allow full screen. Try the button again.');
+  // The shell hides its header, player bar and navigation while immersive.
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle('visualizer-immersive', fullscreen);
+    root.classList.toggle('visualizer-chrome-revealed', fullscreen && chromeRevealed);
+    return () => root.classList.remove('visualizer-immersive', 'visualizer-chrome-revealed');
+  }, [chromeRevealed, fullscreen]);
+
+  // Revealed controls fade away again after a few idle seconds.
+  useEffect(() => {
+    if (!fullscreen || !chromeRevealed || browserOpen) return;
+    const timer = window.setTimeout(() => setChromeRevealed(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [browserOpen, chromeRevealed, fullscreen]);
+
+  useEffect(
+    () => () => {
+      if (enteredDocumentFullscreen.current && document.fullscreenElement) {
+        void document.exitFullscreen().catch(() => undefined);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    if (browserOpen) {
+      activeTileRef.current?.scrollIntoView?.({ inline: 'center', block: 'nearest' });
     }
-  }, []);
+  }, [browserOpen]);
+
+  const toggleFullscreen = useCallback(async () => {
+    const entering = !fullscreen;
+    setFullscreen(entering);
+    setChromeRevealed(false);
+    setBrowserOpen(false);
+    // Document-level full screen (best effort) hides the OS bars while the
+    // app's own navigation stays available to reveal.
+    try {
+      if (entering && !document.fullscreenElement) {
+        await document.documentElement.requestFullscreen?.({ navigationUI: 'hide' });
+        enteredDocumentFullscreen.current = Boolean(document.fullscreenElement);
+      } else if (!entering && enteredDocumentFullscreen.current && document.fullscreenElement) {
+        enteredDocumentFullscreen.current = false;
+        await document.exitFullscreen();
+      }
+    } catch {
+      /* The webview may refuse; the in-app immersive layout still applies. */
+    }
+    if (entering) stageRef.current?.focus();
+  }, [fullscreen]);
+
+  const onPointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (!fullscreen) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('button, input, select, a, .visualizer-browser, .visualizer-toolbar'))
+      return;
+    gesture.current = { x: event.clientX, y: event.clientY, id: event.pointerId };
+  };
+  const onPointerUp = (event: React.PointerEvent<HTMLElement>) => {
+    const start = gesture.current;
+    gesture.current = null;
+    if (!fullscreen || start?.id !== event.pointerId) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    const swipe = 48;
+    if (Math.abs(dx) > swipe && Math.abs(dx) > Math.abs(dy)) {
+      move(dx < 0 ? 1 : -1);
+    } else if (dy < -swipe) {
+      setChromeRevealed(true);
+    } else if (dy > swipe) {
+      setChromeRevealed(false);
+      setBrowserOpen(false);
+    } else if (Math.abs(dx) < 12 && Math.abs(dy) < 12) {
+      setChromeRevealed((revealed) => !revealed);
+      setBrowserOpen(false);
+    }
+  };
 
   const onKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
     if (event.key.toLowerCase() === 'f') {
       event.preventDefault();
       void toggleFullscreen();
+    } else if (event.key === 'Escape' && fullscreen) {
+      event.preventDefault();
+      void toggleFullscreen();
+    } else if (event.key === 'ArrowUp' && fullscreen) {
+      event.preventDefault();
+      setChromeRevealed(true);
     } else if (event.key === 'ArrowRight' && fullscreen) {
       event.preventDefault();
       move(1);
@@ -91,9 +172,21 @@ export function VisualizerStage({ session, track }: { session: Session; track: S
   return (
     <section
       ref={stageRef}
-      className={`visualizer-stage ${browserOpen ? 'has-browser' : ''}`}
+      className={[
+        'visualizer-stage',
+        browserOpen ? 'has-browser' : '',
+        fullscreen ? 'is-immersive' : '',
+        fullscreen && chromeRevealed ? 'is-revealed' : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       tabIndex={0}
       onKeyDown={onKeyDown}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerCancel={() => {
+        gesture.current = null;
+      }}
       aria-label="Music visualizer"
     >
       <Artwork
@@ -117,9 +210,9 @@ export function VisualizerStage({ session, track }: { session: Session; track: S
         <strong>{currentPreset.name}</strong>
         <small>{currentPreset.description}</small>
       </div>
-      {fullscreenError && (
-        <p className="visualizer-error" role="status">
-          {fullscreenError}
+      {fullscreen && !chromeRevealed && (
+        <p className="visualizer-immersive-hint" aria-hidden="true">
+          Tap or swipe up for controls · swipe sideways to change scene
         </p>
       )}
       <div className="visualizer-toolbar" aria-label="Visualizer controls">
@@ -132,7 +225,7 @@ export function VisualizerStage({ session, track }: { session: Session; track: S
           aria-expanded={browserOpen}
           onClick={() => setBrowserOpen((open) => !open)}
         >
-          {currentPreset.name} · Browse
+          {currentPreset.name} · Scenes
         </button>
         <button
           type="button"
@@ -199,18 +292,25 @@ export function VisualizerStage({ session, track }: { session: Session; track: S
               </button>
             ))}
           </div>
-          <div className="visualizer-preset-grid">
+          <div
+            className="visualizer-preset-grid"
+            aria-label="Scenes: swipe to browse, tap to choose"
+          >
             {visiblePresets.map((preset) => (
               <article
                 key={preset.id}
+                ref={player.visualizer === preset.id ? activeTileRef : undefined}
                 className={player.visualizer === preset.id ? 'is-active' : ''}
               >
                 <button
                   type="button"
                   className="preset-main"
+                  aria-pressed={player.visualizer === preset.id}
                   onClick={() => player.setVisualizer(preset.id)}
                 >
-                  <span className={`preset-swatch preset-swatch-${preset.id}`} />
+                  <span
+                    className={`preset-swatch preset-swatch-${preset.id} preset-swatch-category-${preset.category.replace(/[^a-z]/gi, '').toLowerCase()}`}
+                  />
                   <strong>{preset.name}</strong>
                   <small>{preset.description}</small>
                 </button>
@@ -266,8 +366,8 @@ export function VisualizerStage({ session, track }: { session: Session; track: S
             </label>
           </div>
           <p className="visualizer-hint">
-            Auto rotation uses favourites when you have any. Press F for full screen and use ←/→ to
-            change scenes.
+            Auto rotation uses favourites when you have any. In full screen, tap or swipe up for
+            controls and swipe sideways (or ←/→) to change scenes; press F or Esc to leave.
           </p>
           {diagnostics && (
             <p className="visualizer-performance" aria-live="polite">

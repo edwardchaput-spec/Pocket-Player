@@ -770,7 +770,7 @@ The implemented preset registry contains trusted Canvas 2D and WebGL 2 scenes. C
 
 The feature tracker derives bounded bass, mid, treble, energy, centroid, flux, and beat values. AI Conductor uses these values only as a local procedural scene director; it neither records raw audio nor calls an AI/network service. See `docs/decisions/ADR-009-trusted-hybrid-visualizer-engine.md`.
 
-The visualizer stage, rather than the whole application shell, owns Fullscreen API entry. The stage keeps its preset browser, sensitivity, quality, favourite, random, and automatic-rotation controls available while full screen.
+The visualizer has its own route (`/visualizer`), separate from Now Playing. Its full-screen mode is an in-app immersive layout: the stage covers the window and marks the document root (`visualizer-immersive`) so the shell hides its player bar and navigation until a tap or upward swipe reveals them. Document-level Fullscreen API entry is best effort (it hides OS bars where the webview allows it) so the app's own navigation stays reachable. On phone widths the document never scrolls; only the route pane does, which keeps the bottom bars pinned.
 
 ### 14.3 Safety and performance
 

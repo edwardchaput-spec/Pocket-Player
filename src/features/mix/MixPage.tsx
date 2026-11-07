@@ -32,6 +32,7 @@ export function MixPage({ session }: { session: Session }) {
   const [adventure, setAdventure] = useState(0.5);
   const [excludedGenres, setExcludedGenres] = useState<string[]>([]);
   const [excludedTags, setExcludedTags] = useState<string[]>([]);
+  const [includeAudiobooks, setIncludeAudiobooks] = useState(false);
   const playback = usePlaybackStore();
   const genres = useQuery({
     queryKey: ['profile', session.profile.profileId, 'genres'],
@@ -66,6 +67,7 @@ export function MixPage({ session }: { session: Session }) {
       adventure,
       excludedGenres: [...new Set([...excludedGenres, ...genreTags])],
       excludedTags: nonGenreTags,
+      includeAudiobooks,
     });
   };
   const toggleExcludedTag = (tag: string, checked: boolean) => {
@@ -82,8 +84,8 @@ export function MixPage({ session }: { session: Session }) {
           <h1>Track Mix</h1>
         </div>
         <p className="muted">
-          A reproducible blend of favourites, underplayed tracks, related music, recent additions,
-          and discovery.
+          A fresh, varied draw from your whole library every time: favourites, underplayed tracks,
+          related music, recent additions, and discovery, spread across artists.
         </p>
       </PageHeader>
       <form className="mix-builder" onSubmit={submit}>
@@ -191,6 +193,14 @@ export function MixPage({ session }: { session: Session }) {
             value={length}
             onChange={(event) => setLength(Number(event.target.value))}
           />
+        </label>
+        <label className="mix-checkbox">
+          <input
+            type="checkbox"
+            checked={includeAudiobooks}
+            onChange={(event) => setIncludeAudiobooks(event.target.checked)}
+          />
+          <span>Include audiobooks and spoken word</span>
         </label>
         <label className="mix-adventure-control">
           <span className="mix-range-legend">

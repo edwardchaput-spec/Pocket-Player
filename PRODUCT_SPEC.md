@@ -403,7 +403,7 @@ The first complete mix engine should start with approximately:
 - 15 percent recently added tracks.
 - 10 percent broad discovery.
 
-These proportions are targets, not guarantees. The engine must fill from available sources and record why a source was unavailable.
+These proportions are targets, not guarantees. They shift with the Familiar to Adventurous slider (familiar shrinks, underplayed and discovery grow), and the related share applies only when a seed exists. The engine samples with seeded Gumbel-top-k noise so every build differs while a fixed seed reproduces, fills from available sources, and relaxes artist/album caps only when a narrow recipe needs it. Audiobooks and spoken word are excluded by default.
 
 ### 9.3 Ranking and constraints
 
