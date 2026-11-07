@@ -27,6 +27,7 @@ import {
 import { currentQueueItem, type PlaybackStatus, usePlaybackStore } from './playbackStore';
 import { ScrobbleController } from './ScrobbleController';
 import { AudioAnalysisProvider } from './AudioAnalysisContext';
+import { PlaybackTransport, PlaybackTransportContext } from './transportContext';
 import { type AudioAnalyserSource, NativeSpectrumAnalyser } from './nativeAnalyser';
 import { NativePlaybackSync } from './nativePlaybackSync';
 import { createTrackReporter, finishTrackReporter, recordTrackError } from './trackReporter';
@@ -418,7 +419,9 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
 
   return (
     <AudioAnalysisProvider analyser={analyser}>
-      {children}
+      <PlaybackTransportContext.Provider value={transport}>
+        {children}
+      </PlaybackTransportContext.Provider>
       {!nativeOutput && (
         <audio
           ref={audioRef}
@@ -499,13 +502,6 @@ export function PlayerProvider({ children, session }: PropsWithChildren<{ sessio
       <PlayerBar transport={transport} proxyBaseUrl={session.proxyBaseUrl} />
     </AudioAnalysisProvider>
   );
-}
-
-/** Output-agnostic controls: HTML audio on Windows, native Media3 on Android. */
-interface PlaybackTransport {
-  play(): void;
-  pause(): void;
-  seek(seconds: number): void;
 }
 
 interface PlayerBarProps {
@@ -620,7 +616,7 @@ function ActivePlayerBar({ transport, proxyBaseUrl }: PlayerBarProps) {
         </button>
         <Link
           className="player-utility-button visualizer-link"
-          to="/now-playing#visualizer"
+          to="/visualizer"
           aria-label="Open visualiser"
           title="Open visualiser"
         >

@@ -54,23 +54,25 @@ The index contains metadata only. Audio remains on Navidrome and streams on dema
 
 - Track Mix offers general, radio, genre, decade, recent, forgotten-favourite, rediscovery, and low-play recipes.
 - The familiarity slider shifts the balance without disabling diversity safeguards.
+- Every build is a fresh weighted draw from the whole library: higher-scoring tracks are likelier but never guaranteed, prolific artists are damped, each artist and album is capped, tracks heard in the last few days rest, and the same artist never plays back to back when it can be avoided.
+- Audiobooks, podcasts and spoken word (by media type, genre, folder or album naming, or tracks of 40 minutes or more) are left out unless **Include audiobooks and spoken word** is ticked.
 - **Exclude tags** lists indexed moods, including dual Genre/Mood tags, and falls back to indexed genres when the library has no mood metadata.
-- Each generated row explains why it was selected; warnings explain unavailable sources.
+- Each generated row explains why it was selected; a warning appears only when the recipe cannot fill the requested length.
 - Statistics are explicitly based only on playback observed by this desktop application, not every Navidrome client.
 
 ## Lyrics and visualisers
 
-- Now Playing displays plain or synchronized lyrics when Navidrome exposes the OpenSubsonic lyrics endpoint.
-- Open **Now Playing** and choose **Browse** to explore 22 visualizers grouped into Classic, Particles, 3D & shaders, and Adaptive categories.
+- **Now Playing** is a full page with large artwork, seek bar, transport, favourite, rating, and up next. It displays plain or synchronized lyrics when Navidrome exposes the OpenSubsonic lyrics endpoint.
+- The visualiser has its own page (**Visualiser** in the sidebar or **More**, or the bars icon in the player). Choose **Scenes** to swipe through large preview tiles of 22 visualizers grouped into Classic, Particles, 3D & shaders, and Adaptive categories.
 - **Sol5.6** turns the live spectrum into tokens, attention paths, memory rails, and a luminous inference core. It is entirely local and does not record or transmit audio.
 - Particle scenes include Hyperdrive, Beat sparks, Cosmic dust, Chromatic fountain, Album orbit, Neon rain, and Ribbon trails.
 - GPU and pseudo-3D scenes include Neon tunnel, Audio landscape, Pulse geometry, Frequency city, Particle galaxy, Liquid plasma, and Album dimension. Kaleidoscope provides a MilkDrop-inspired radial treatment.
 - **AI Conductor** interprets frequency balance, energy, spectral motion, and beats locally, then blends galaxy, tunnel, and plasma treatments. It does not upload audio or contact an AI service.
 - Star presets with **★**. Automatic rotation uses favourites when any exist; otherwise it rotates through the complete pack. Random mode changes the order.
 - Adjust sensitivity, quality, and rotation interval in the preset browser or Settings.
-- **Full screen** expands only the visualizer. Press Escape or its exit button to leave, F to toggle, and Left/Right Arrow to change scenes while full screen.
+- **Full screen** is immersive: only the visual remains. Tap or swipe up to reveal the scene controls, player, and navigation (they hide again after a few seconds); swipe down to hide them and swipe sideways to change scene. On a keyboard, F toggles, Escape leaves, Up Arrow reveals controls, and Left/Right Arrow change scenes.
 - Full-screen and visualizer changes affect visuals only; playback continues through the one persistent audio element.
-- Visualizers sleep while music is paused, the window is hidden, or Now Playing is off-screen. During sustained heavy scenes they automatically step from 60 to 45 or 30 FPS and reduce internal resolution, then restore quality gradually.
+- Visualizers sleep while music is paused, the window is hidden, or the visualiser is off-screen. During sustained heavy scenes they automatically step from 60 to 45 or 30 FPS and reduce internal resolution, then restore quality gradually.
 - Low, Balanced, and High cap the internal canvas around 720p, 1440p, and 4K respectively. WebGL scenes request the high-performance GPU; open **Browse** to see the renderer WebView2 selected and the current FPS ceiling.
 
 ## Desktop behavior

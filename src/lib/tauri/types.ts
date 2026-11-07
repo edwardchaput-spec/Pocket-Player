@@ -398,6 +398,8 @@ export interface MixInput {
   adventure: number;
   excludedGenres?: string[] | undefined;
   excludedTags?: string[] | undefined;
+  /** Audiobooks, podcasts and spoken word are left out unless true. */
+  includeAudiobooks?: boolean | undefined;
   randomSeed?: string | undefined;
 }
 
