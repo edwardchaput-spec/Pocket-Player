@@ -63,8 +63,9 @@ The index contains metadata only. Audio remains on Navidrome and streams on dema
 ## Lyrics and visualisers
 
 - **Now Playing** is a full page with large artwork, seek bar, transport, favourite, rating, and up next. It displays plain or synchronized lyrics when Navidrome exposes the OpenSubsonic lyrics endpoint.
-- The visualiser has its own page (**Visualiser** in the sidebar or **More**, or the bars icon in the player). Choose **Scenes** to swipe through large preview tiles of 22 visualizers grouped into Classic, Particles, 3D & shaders, and Adaptive categories.
+- The visualiser has its own page (**Visualiser** in the sidebar or **More**, or the bars icon in the player). Choose **Scenes** to swipe through large preview tiles of 23 visualizers grouped into Classic, Particles, 3D & shaders, and Adaptive categories.
 - **Sol5.6** turns the live spectrum into tokens, attention paths, memory rails, and a luminous inference core. It is entirely local and does not record or transmit audio.
+- **Claude mind** is a listening brain. Each neuron owns a slice of the spectrum (bass at the centre, treble at the rim) and fires when its band jumps, sending sparks along its synapses that can set off chains of thought. Beats spark insights from the core, the waveform wraps the mind as its inner voice, and every couple of seconds it keeps a memory that drifts outward. When the music returns to something it has heard, such as a chorus, that memory glows and links back to the core. Quiet captions share what it is noticing. It runs entirely on the local analyser data.
 - Particle scenes include Hyperdrive, Beat sparks, Cosmic dust, Chromatic fountain, Album orbit, Neon rain, and Ribbon trails.
 - GPU and pseudo-3D scenes include Neon tunnel, Audio landscape, Pulse geometry, Frequency city, Particle galaxy, Liquid plasma, and Album dimension. Kaleidoscope provides a MilkDrop-inspired radial treatment.
 - **AI Conductor** interprets frequency balance, energy, spectral motion, and beats locally, then blends galaxy, tunnel, and plasma treatments. It does not upload audio or contact an AI service.

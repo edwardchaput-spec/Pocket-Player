@@ -2320,6 +2320,16 @@ input[type='range'] {
     linear-gradient(115deg, transparent 35%, #5eeaff 36% 38%, transparent 39%),
     linear-gradient(65deg, transparent 55%, #ff53d4 56% 58%, transparent 59%), #0c0d21;
 }
+.preset-swatch-claudeMind {
+  background:
+    radial-gradient(circle at 50% 50%, #fff4e0 0 3px, #ffb27a99 5px, transparent 22%),
+    radial-gradient(circle at 34% 38%, #ffd9a8 0 2px, transparent 3px),
+    radial-gradient(circle at 63% 33%, #ff9b6b 0 2px, transparent 3px),
+    radial-gradient(circle at 58% 66%, #ffcf8a 0 2px, transparent 3px),
+    radial-gradient(circle at 40% 64%, #e9a0ff 0 2px, transparent 3px),
+    radial-gradient(circle at 50% 50%, transparent 30%, #d9775766 31% 32%, transparent 33%),
+    radial-gradient(circle at 50% 50%, #3a1c12, #0d0a09 72%);
+}
 .preset-favourite {
   position: absolute;
   top: 6px;
