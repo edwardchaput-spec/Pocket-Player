@@ -31,7 +31,7 @@ Windows is unchanged: one HTML audio element remains the output there.
 ## Consequences
 
 - Reliable background, lock-screen, Bluetooth, and Android Auto playback while the app process is alive.
-- Android Auto works only after the user has signed in during the current process, because Android credentials are still session-only. If the process has died, the car shows an empty library until the app is opened. Auto playback with the phone locked from a cold start therefore depends on the Keystore-backed credential store on the roadmap.
+- Android Auto works only while the app process has a signed-in session. Since [ADR-012](ADR-012-android-keystore-credentials.md) the session restores itself when the app opens, but if the process has died the car shows an empty library until the app is opened. Signing in from a cold Auto start without the app's UI would need the service to restore the session itself.
 - Shuffling or reordering the queue re-sends the native playlist, which re-buffers the current track briefly. Incremental native queue edits can remove that later.
 - Spectrum frames are taken before the audio sink buffer, so visuals lead the audio by up to the sink buffer length (roughly a quarter of a second).
 - Two output implementations behind one store contract: frontend unit tests cover the sync logic, while the Kotlin service needs device and DHU testing.

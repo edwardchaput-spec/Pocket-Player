@@ -21,7 +21,7 @@ Navidrome remains the remote server and source of truth. The desktop application
 1. A React and TypeScript user interface rendered by Windows WebView2 or Android System WebView through Tauri.
 2. A Rust backend embedded in the same installed application.
 3. A Rust Navidrome client that performs authenticated API requests.
-4. A platform credential strategy: Windows Credential Manager on Windows and process-memory-only credentials on Android until Keystore-backed persistence is implemented.
+4. A platform credential strategy: Windows Credential Manager on Windows and an Android Keystore-backed store on Android (ADR-012).
 5. A loopback-only Rust media proxy for artwork and audio streaming.
 6. Local non-secret settings, a SQLite metadata cache, and a listening-event database.
 
@@ -34,7 +34,7 @@ flowchart LR
     U[Local user] --> UI[React UI in Tauri webview]
     UI -->|Tauri IPC commands| R[Rust application core]
     R -->|HTTPS Subsonic/OpenSubsonic API| N[Existing Navidrome server]
-    R -->|platform credential strategy| C[Windows Credential Manager or Android process memory]
+    R -->|platform credential strategy| C[Windows Credential Manager or Android Keystore]
     R -->|non-secret settings| S[Tauri app data directory]
     R -->|cache and local events| D[Local SQLite database]
     UI -->|audio and artwork requests| P[Loopback media proxy]
@@ -66,7 +66,7 @@ A production build contains:
 - Required icons and resources.
 - An NSIS/MSI installer for Windows or an APK/AAB package for Android.
 
-At runtime, the app stores only local user-specific non-secret data in Tauri application directories. Remembered passwords use Windows Credential Manager on Windows; the Android implementation currently keeps the password in process memory and does not persist it.
+At runtime, the app stores only local user-specific non-secret data in Tauri application directories. Remembered passwords use Windows Credential Manager on Windows. On Android they are encrypted with a non-exportable Android Keystore AES-GCM key, and only the ciphertext is kept in app-private storage (ADR-012).
 
 ### 3.3 Home-server impact
 
@@ -99,7 +99,7 @@ If a reverse proxy later adds a separate login page, forward-auth layer, or exte
 | Rust errors | `thiserror` | Structured internal error types |
 | Hashing and IDs | `sha2`, protocol-required MD5, and `uuid` | Stable profile IDs, Subsonic auth, playback sessions |
 | Logging | `tracing` with explicit redaction | Structured diagnostics without secret leakage |
-| Credential storage | Platform strategy owned by Rust | Windows uses Credential Manager; Android remains session-only until Keystore-backed persistence is added |
+| Credential storage | Platform strategy owned by Rust | Windows uses Credential Manager; Android uses a Keystore-backed store (ADR-012) |
 | Non-secret settings | Official Tauri Store plugin | Small persistent settings with Tauri path handling |
 | Local database | SQLite owned by Rust | Cached metadata, local queue snapshots, playback events, migrations |
 | Tests | Vitest, React Testing Library, Rust unit/integration tests | Fast feedback across both halves of the app |
@@ -208,7 +208,7 @@ sequenceDiagram
 
 ### 7.3 Credential storage
 
-Use a Rust-owned platform credential strategy. Windows uses a native Credential Manager entry. Android uses a process-memory-only implementation and forces `remember_credential` off until a separately reviewed Keystore-backed implementation is available.
+Use a Rust-owned platform credential strategy. Windows uses a native Credential Manager entry. Android encrypts the password with a non-exportable Android Keystore key through a Rust-only plugin bridge ([ADR-012](docs/decisions/ADR-012-android-keystore-credentials.md)). Targets without a platform store fall back to process memory and force `remember_credential` off.
 
 Recommended coordinates:
 
@@ -1099,7 +1099,7 @@ npm run tauri build
 
 ### ADR-003: Rust owns platform credential storage
 
-**Decision:** Use Windows Credential Manager for remembered Windows passwords and a session-only in-memory store on Android until Keystore-backed persistence is implemented.
+**Decision:** Use Windows Credential Manager for remembered Windows passwords and an Android Keystore-backed store on Android (ADR-012).
 
 **Reason:** Secrets must never fall back to plaintext settings merely to make a platform port work.
 

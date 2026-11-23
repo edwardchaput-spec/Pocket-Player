@@ -45,7 +45,11 @@ impl AppError {
     pub fn credential() -> Self {
         Self::new(
             "CREDENTIAL_ERROR",
-            "Windows Credential Manager could not be accessed.",
+            if cfg!(target_os = "android") {
+                "The phone's secure credential store could not be accessed."
+            } else {
+                "Windows Credential Manager could not be accessed."
+            },
             true,
         )
     }

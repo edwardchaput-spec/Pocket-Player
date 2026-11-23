@@ -41,8 +41,8 @@ url = { version = "2.5.4", features = ["serde"] }
 uuid = { version = "1.18.0", features = ["serde", "v4"] }
 zeroize = { version = "1.8.1", features = ["derive"] }
 
-# Windows Credential Manager is the only persistent credential store; other
-# targets (Android) use a process-memory store until a Keystore design exists.
+# Remembered passwords: Windows Credential Manager on Windows and the Android
+# Keystore (through the pocket-playback plugin) on Android (ADR-003, ADR-012).
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "4.1.6", default-features = false, features = ["v1", "windows-native-keyring-store"] }
 

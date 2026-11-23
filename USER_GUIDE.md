@@ -1,6 +1,6 @@
 # Pocket Player user guide
 
-This guide covers the current Windows source build. The Android adaptive interface is a technical preview: credentials remain session-only and device lifecycle, packaging, and distribution are still under validation.
+This guide covers the current Windows source build. The Android adaptive interface is a technical preview: device lifecycle, packaging, and distribution are still under validation.
 
 ## Starting Pocket Player
 
@@ -12,7 +12,7 @@ This guide covers the current Windows source build. The Android adaptive interfa
 
 1. Start the app with `npm.cmd run tauri dev` during development, or launch an installed build.
 2. Enter the canonical Navidrome base URL, username, and password.
-3. Leave **Remember login** enabled to store only the password in Windows Credential Manager. The password is never written to settings or SQLite.
+3. Leave **Remember login** enabled to stay signed in. On Windows the password goes into Windows Credential Manager; on Android it is encrypted with a key held in the phone's Android Keystore. The password is never written to settings or SQLite in readable form.
 4. Private-LAN HTTP requires an explicit warning confirmation. Public HTTP and invalid TLS certificates are rejected.
 
 ## Browse and play

@@ -2,7 +2,7 @@
 
 Pocket Player is built and run directly on Windows. It connects to an existing Navidrome server; no Docker, VM, LXC, remote SSH host, or server-side component is used.
 
-This guide documents the reproducible Windows workflow and the Android technical-preview build. Android device-matrix validation, signing, and Keystore-backed credential persistence are not yet a supported release workflow.
+This guide documents the reproducible Windows workflow and the Android technical-preview build. Android device-matrix validation and signing are not yet a supported release workflow.
 
 ## Windows prerequisites
 
@@ -97,7 +97,7 @@ Device checks to perform before calling an Android build validated:
 4. Android Auto, checked with the Desktop Head Unit (`$env:ANDROID_HOME\extras\google\auto\desktop-head-unit.exe`) after enabling developer mode in the Android Auto app: the browse tree, search, track selection, and transport controls all work.
 5. HTTPS to the Navidrome server works on a release build. This exercises the Android certificate verifier and the cleartext rule that admits only `127.0.0.1`.
 
-Android passwords are session-only, so Android Auto has a library only while the app process has a signed-in session.
+Android remembers passwords in the Keystore-backed store (ADR-012), so opening the app restores the session. Android Auto still has a library only while the app process has a signed-in session.
 
 ### Testing Android Auto with the Desktop Head Unit
 
