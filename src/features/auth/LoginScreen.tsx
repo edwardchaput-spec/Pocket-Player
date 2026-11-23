@@ -28,13 +28,16 @@ export function LoginScreen({
   loginAction = login,
   platformInfoAction = getPlatformInfo,
 }: LoginScreenProps) {
-  // Windows can remember passwords in Credential Manager; Android cannot yet.
+  // Windows remembers passwords in Credential Manager, Android in its Keystore.
   const [persistentCredentials, setPersistentCredentials] = useState(true);
+  const [platform, setPlatform] = useState('windows');
   useEffect(() => {
     let active = true;
     platformInfoAction()
       .then((info) => {
-        if (active) setPersistentCredentials(info.persistentCredentials);
+        if (!active) return;
+        setPersistentCredentials(info.persistentCredentials);
+        setPlatform(info.platform);
       })
       .catch(() => undefined);
     return () => {
@@ -159,7 +162,9 @@ export function LoginScreen({
                   setFields({ ...fields, rememberCredential: event.target.checked })
                 }
               />
-              Remember login in Windows Credential Manager
+              {platform === 'android'
+                ? 'Remember login securely on this phone'
+                : 'Remember login in Windows Credential Manager'}
             </label>
           ) : (
             <p className="muted">

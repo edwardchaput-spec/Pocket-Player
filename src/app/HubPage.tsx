@@ -15,7 +15,8 @@ export const LIBRARY_HUB_LINKS: readonly HubLink[] = [
 ];
 
 export const MORE_HUB_LINKS: readonly HubLink[] = [
-  { to: '/now-playing', label: 'Now Playing', description: 'Visualisers and lyrics' },
+  { to: '/now-playing', label: 'Now Playing', description: 'Artwork, controls, and lyrics' },
+  { to: '/visualizer', label: 'Visualiser', description: 'Full-screen music visuals' },
   { to: '/queue', label: 'Queue', description: 'Reorder what plays next' },
   { to: '/mix', label: 'Track Mix', description: 'Build an explainable mix' },
   { to: '/statistics', label: 'Statistics', description: 'Listening on this device' },

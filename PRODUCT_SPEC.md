@@ -101,7 +101,7 @@ The initial product is not intended to:
    - Navidrome password.
    - Whether the login should be remembered.
 4. The app validates the connection with the supported API.
-5. On Windows, the password is stored in Windows Credential Manager when "Remember me" is enabled. Android keeps it only in process memory until a Keystore-backed persistent strategy is implemented. It is never stored in localStorage, a JSON settings file, logs, source code, or SQLite.
+5. On Windows, the password is stored in Windows Credential Manager when "Remember me" is enabled. On Android it is encrypted with a non-exportable Android Keystore key, and only the ciphertext is kept in app-private storage. It is never stored in localStorage, a JSON settings file, logs, source code, or SQLite.
 6. The app loads the home screen with real library data.
 7. The user opens an album and starts a track.
 8. A persistent bottom player displays the current track and controls.
@@ -139,7 +139,7 @@ The application must:
 - Generate a fresh random salt for each server request.
 - Never send the clear-text password as a query parameter.
 - Keep the password on the Rust side after login whenever possible.
-- Store remembered credentials in Windows Credential Manager. Keep Android credentials session-only until a Keystore-backed credential strategy is available.
+- Store remembered credentials in Windows Credential Manager. On Android, store remembered credentials with the Keystore-backed strategy (ADR-012).
 - Allow the user to test the connection again from Settings.
 - Provide a clear logout action that deletes the saved credential and local session data.
 - Distinguish invalid credentials, permission failures, unreachable host, DNS failure, TLS failure, timeout, and incompatible API responses.
@@ -403,7 +403,7 @@ The first complete mix engine should start with approximately:
 - 15 percent recently added tracks.
 - 10 percent broad discovery.
 
-These proportions are targets, not guarantees. The engine must fill from available sources and record why a source was unavailable.
+These proportions are targets, not guarantees. They shift with the Familiar to Adventurous slider (familiar shrinks, underplayed and discovery grow), and the related share applies only when a seed exists. The engine samples with seeded Gumbel-top-k noise so every build differs while a fixed seed reproduces, fills from available sources, and relaxes artist/album caps only when a narrow recipe needs it. Audiobooks and spoken word are excluded by default.
 
 ### 9.3 Ranking and constraints
 
@@ -531,7 +531,7 @@ Targets for a normal desktop or current Android device and a large personal libr
 
 ## 15. Security and privacy requirements
 
-- Remembered passwords are stored only in Windows Credential Manager on Windows. Android passwords remain process-memory-only until a Keystore-backed strategy is implemented.
+- Remembered passwords are stored only in Windows Credential Manager on Windows and the Android Keystore-backed store on Android.
 - No secret in localStorage, sessionStorage, source, environment files committed to Git, plain settings files, logs, crash reports, or analytics.
 - Navidrome requests are created by the Rust backend.
 - Authenticated Navidrome URLs are not exposed to the webview or copied to logs.
@@ -619,7 +619,7 @@ The MVP is ready for daily personal use when:
 
 1. It installs and launches on the user's Windows desktop or supported Android device.
 2. It connects to the existing Navidrome server using a normal Navidrome account.
-3. It remembers the login securely where platform storage is implemented and never stores a plaintext password in application files; Android remains explicitly session-only until then.
+3. It remembers the login securely through platform storage on Windows and Android and never stores a plaintext password in application files.
 4. It presents real library data for home, search, albums, artists, tracks, and playlists.
 5. It streams a full album without the UI losing playback state.
 6. Play, pause, previous, next, seek, volume, shuffle, repeat, and queue controls work consistently.

@@ -18,6 +18,7 @@ vi.mock('../lib/tauri/library', () => ({
   refreshLibraryIndex: vi.fn(() => Promise.resolve({ ready: true, trackCount: 0 })),
   getStarred: vi.fn(() => Promise.resolve({ artists: [], albums: [], songs: [] })),
   searchLibrary: vi.fn(() => Promise.resolve({ artists: [], albums: [], songs: [] })),
+  getLyrics: vi.fn(() => Promise.resolve({ lyrics: [] })),
 }));
 vi.mock('../lib/tauri/playback', () => ({
   recordPlaybackEvent: vi.fn(() => Promise.resolve()),
@@ -73,6 +74,16 @@ it('shows debounced library results from the persistent search field', async () 
   expect(await screen.findByRole('heading', { name: 'Search results' })).toBeInTheDocument();
   await waitFor(() => expect(searchLibrary).toHaveBeenCalledWith('signal'));
   expect((await screen.findAllByText(songsFixture[0]!.title)).length).toBeGreaterThan(0);
+});
+
+it('keeps typed spaces in multi-word searches', async () => {
+  renderShell('/home');
+  const search = screen.getByRole('searchbox', { name: 'Search artists, albums, and tracks' });
+
+  await userEvent.type(search, 'dark side');
+
+  expect(search).toHaveValue('dark side');
+  await waitFor(() => expect(searchLibrary).toHaveBeenCalledWith('dark side'));
 });
 
 it('hydrates the integrated search from a direct results link', () => {
@@ -211,4 +222,18 @@ it('goes up to the parent hub on a fresh entry and back through history after dr
   await userEvent.click(screen.getByRole('link', { name: /Queue.*Reorder/ }));
   await userEvent.click(screen.getByRole('button', { name: 'Back to More' }));
   expect(await screen.findByRole('heading', { name: 'More', level: 1 })).toBeInTheDocument();
+});
+
+it('shows a full Now Playing page with its own transport and a separate visualiser', async () => {
+  renderShell('/now-playing');
+  const page = screen.getByRole('region', { name: 'Now playing' });
+
+  expect(within(page).getByRole('heading', { name: songsFixture[0]!.title })).toBeInTheDocument();
+  expect(within(page).getByRole('slider', { name: 'Seek' })).toBeInTheDocument();
+  expect(within(page).getByRole('button', { name: 'Next track' })).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Music visualizer' })).toBeNull();
+
+  await userEvent.click(within(page).getByRole('link', { name: 'Visualiser' }));
+  expect(await screen.findByRole('region', { name: 'Music visualizer' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Back to More' })).toBeInTheDocument();
 });

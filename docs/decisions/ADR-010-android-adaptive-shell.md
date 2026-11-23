@@ -23,5 +23,5 @@ Android system back continues to use Tauri/Wry webview history. Detail screens a
 - Desktop navigation and desktop-only integrations remain unchanged at expanded widths.
 - Rotation and larger Android screens can move naturally from bottom navigation to a rail or sidebar without user-agent checks.
 - Search, queue, settings, statistics, visualisers, and every library route retain the same typed Tauri facade and Rust-owned networking.
-- Android passwords remain process-memory-only until a separately reviewed, Keystore-backed credential implementation is available.
+- Android passwords were process-memory-only when this was decided; [ADR-012](ADR-012-android-keystore-credentials.md) adds Keystore-backed persistence.
 - Compact layout, safe-area behavior, touch targets, orientation changes, and system Back behavior require device-level Android release checks in addition to frontend unit tests.

@@ -94,6 +94,28 @@ describe('Track Mix tag exclusions', () => {
     );
   });
 
+  it('leaves audiobooks out of the mix unless the listener opts in', async () => {
+    vi.mocked(getTags).mockResolvedValue([]);
+    const user = renderMix();
+
+    const toggle = screen.getByRole('checkbox', { name: 'Include audiobooks and spoken word' });
+    expect(toggle).not.toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Build mix' }));
+    await waitFor(() =>
+      expect(generateMix).toHaveBeenLastCalledWith(
+        expect.objectContaining({ includeAudiobooks: false }),
+      ),
+    );
+
+    await user.click(toggle);
+    await user.click(screen.getByRole('button', { name: 'Build mix' }));
+    await waitFor(() =>
+      expect(generateMix).toHaveBeenLastCalledWith(
+        expect.objectContaining({ includeAudiobooks: true }),
+      ),
+    );
+  });
+
   it('explains when the real index has no tags', async () => {
     vi.mocked(getTags).mockResolvedValue([]);
     renderMix();

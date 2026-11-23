@@ -248,6 +248,7 @@ fn valid_visualizer(mode: &str) -> bool {
             | "kaleidoscope"
             | "ai"
             | "sol56"
+            | "claudeMind"
     )
 }
 
@@ -511,6 +512,7 @@ mod tests {
         assert!(valid_visualizer("neonTunnel"));
         assert!(valid_visualizer("ai"));
         assert!(valid_visualizer("sol56"));
+        assert!(valid_visualizer("claudeMind"));
         assert!(!valid_visualizer("downloaded-script"));
 
         let duplicate_favorites = PlayerSettings {

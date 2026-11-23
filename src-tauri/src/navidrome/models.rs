@@ -98,6 +98,13 @@ pub struct Song {
     pub display_album_artist: Option<String>,
     #[serde(default)]
     pub moods: Vec<String>,
+    /// Subsonic media type (`music`, `podcast`, `audiobook`, `video`).
+    #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+    pub media_type: Option<String>,
+    /// Library-relative path as reported by the server; used only to
+    /// recognise audiobook folders when building mixes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

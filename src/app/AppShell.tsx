@@ -23,6 +23,7 @@ import { StatisticsPage } from '../features/statistics/StatisticsPage';
 import { TracksPage } from '../features/tracks/TracksPage';
 import { TagPage } from '../features/tags/TagPage';
 import { TagsPage } from '../features/tags/TagsPage';
+import { VisualizerPage } from '../features/visualizer/VisualizerPage';
 
 const NAV_ITEMS = [
   { to: '/home', label: 'Home', glyph: '◇' },
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { to: '/playlists', label: 'Playlists', glyph: '≡' },
   { to: '/queue', label: 'Queue', glyph: '↥' },
   { to: '/now-playing', label: 'Now Playing', glyph: '▶' },
+  { to: '/visualizer', label: 'Visualiser', glyph: '✺' },
   { to: '/statistics', label: 'Statistics', glyph: '∿' },
   { to: '/mix', label: 'Track Mix', glyph: '✦' },
   { to: '/settings', label: 'Settings', glyph: '⌘' },
@@ -54,7 +56,7 @@ const BOTTOM_NAV_ITEMS = [
     to: '/more',
     label: 'More',
     glyph: '⋯',
-    match: ['/more', '/now-playing', '/queue', '/mix', '/statistics', '/settings'],
+    match: ['/more', '/now-playing', '/visualizer', '/queue', '/mix', '/statistics', '/settings'],
   },
 ] as const;
 
@@ -65,6 +67,13 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
   const searchInput = useRef<HTMLInputElement>(null);
   const routeSearch = new URLSearchParams(location.search).get('q') ?? '';
   const searchValue = location.pathname === '/search' ? routeSearch : search;
+  const scrollerRef = useRef<HTMLDivElement>(null);
+
+  // On phones the route pane is the scroll container (so the bottom bars can
+  // never scroll away); start each destination at the top.
+  useEffect(() => {
+    scrollerRef.current?.scrollTo?.({ top: 0 });
+  }, [location.pathname]);
 
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
@@ -85,8 +94,12 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
   }, []);
 
   const showSearchResults = (value: string, replace = location.pathname === '/search') => {
-    const query = value.trim();
-    void navigate(`/search${query ? `?q=${encodeURIComponent(query)}` : ''}`, { replace });
+    // Keep the raw text (spaces included) in the URL: the field mirrors `q`
+    // while on /search, so trimming here would swallow every typed space.
+    // The results page trims before querying.
+    void navigate(`/search${value.trim() ? `?q=${encodeURIComponent(value)}` : ''}`, {
+      replace,
+    });
   };
   const submitSearch = (event: FormEvent) => {
     event.preventDefault();
@@ -130,7 +143,7 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
             </div>
           </div>
         </aside>
-        <div className="route-content">
+        <div className="route-content" ref={scrollerRef}>
           <header className="workspace-header">
             {parent && (
               <button
@@ -214,6 +227,7 @@ export function AppShell({ session, onLogout }: { session: Session; onLogout: ()
             />
             <Route path="/more" element={<HubPage title="More" links={MORE_HUB_LINKS} />} />
             <Route path="/now-playing" element={<NowPlayingPage session={session} />} />
+            <Route path="/visualizer" element={<VisualizerPage session={session} />} />
             <Route path="/statistics" element={<StatisticsPage session={session} />} />
             <Route path="/mix" element={<MixPage session={session} />} />
             <Route
@@ -254,7 +268,9 @@ export function parentRoute(pathname: string): string | null {
   const detail = /^\/(albums|artists|genres|tags|playlists)\/[^/]+/.exec(pathname);
   if (detail) return `/${detail[1]}`;
   if (['/albums', '/artists', '/tracks', '/genres', '/tags'].includes(pathname)) return '/library';
-  if (['/queue', '/now-playing', '/mix', '/statistics', '/settings'].includes(pathname)) {
+  if (
+    ['/queue', '/now-playing', '/visualizer', '/mix', '/statistics', '/settings'].includes(pathname)
+  ) {
     return '/more';
   }
   return null;
@@ -279,6 +295,7 @@ function routeTitle(pathname: string): string {
     '/library': 'Library',
     '/more': 'More',
     '/now-playing': 'Now Playing',
+    '/visualizer': 'Visualiser',
     '/statistics': 'Statistics',
     '/mix': 'Track Mix',
     '/settings': 'Settings',

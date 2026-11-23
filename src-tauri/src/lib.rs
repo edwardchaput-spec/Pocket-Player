@@ -46,6 +46,7 @@ pub fn run() {
     let app = builder
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_pocket_playback::init())
+        .plugin(tauri_plugin_pocket_playback::init_secure_store())
         .plugin(tauri_plugin_store::Builder::default().build())
         .setup(|app| {
             #[cfg(target_os = "android")]
@@ -56,7 +57,7 @@ pub fn run() {
                 app.path().app_data_dir()?.join("library.sqlite3"),
             )?);
             app.manage(AppState::new(
-                credentials::platform_store(),
+                credentials::platform_store(app.handle()),
                 active_client,
                 proxy,
                 database,

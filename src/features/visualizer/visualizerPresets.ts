@@ -21,6 +21,7 @@ export const VISUALIZER_MODES = [
   'kaleidoscope',
   'ai',
   'sol56',
+  'claudeMind',
 ] as const;
 
 export type VisualizerMode = (typeof VISUALIZER_MODES)[number];
@@ -187,6 +188,14 @@ export const VISUALIZER_PRESETS: VisualizerPreset[] = [
     id: 'sol56',
     name: 'Sol5.6',
     description: 'Spectral tokens flow through attention, memory and a luminous inference core.',
+    category: 'Adaptive',
+    renderer: 'canvas2d',
+  },
+  {
+    id: 'claudeMind',
+    name: 'Claude mind',
+    description:
+      'A listening mind: notes fire neurons, beats spark insights, and choruses it remembers glow.',
     category: 'Adaptive',
     renderer: 'canvas2d',
   },

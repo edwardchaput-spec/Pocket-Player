@@ -155,7 +155,7 @@ The aim is to identify onboarding failure modes, playback trust issues, and whet
 | Duplicate playback/scrobbles             | Corrupt history and unreliable controls       | One audio owner, playback-session IDs, duplicate protection               | Extended real-library soak testing                                 |
 | Large-library latency                    | Search and browse become frustrating          | SQLite cache, bounded refresh, whole-index filtering/sorting              | Benchmarks with varied large libraries and devices                 |
 | Recommendation quality                   | Discovery feels random or repetitive          | Source mix, recency penalties, artist spacing, reasons/warnings           | Observed play-through/skip behaviour and qualitative feedback      |
-| Android platform gaps                    | Inconsistent promise across platforms         | Adaptive shell, safe areas, session-only credentials                      | Device matrix, lifecycle/audio, packaging, and Keystore validation |
+| Android platform gaps                    | Inconsistent promise across platforms         | Adaptive shell, safe areas, Keystore credentials                          | Device matrix, lifecycle/audio, packaging, and Keystore validation |
 | Unsigned distribution                    | Installation warnings and unsafe update story | No public release claim                                                   | Publisher identity, protected signing, updater infrastructure      |
 
 ## Next product decisions

@@ -94,3 +94,19 @@ it('replaces the remember option with a session-only note where passwords cannot
   expect(await screen.findByText(/kept only while the app is running/)).toBeInTheDocument();
   expect(screen.queryByRole('checkbox', { name: /Credential Manager/ })).toBeNull();
 });
+
+it('offers to remember the login on Android when the Keystore store is available', async () => {
+  render(
+    <LoginScreen
+      savedProfile={null}
+      onConnected={vi.fn()}
+      platformInfoAction={() =>
+        Promise.resolve({ platform: 'android', persistentCredentials: true })
+      }
+    />,
+  );
+  expect(
+    await screen.findByRole('checkbox', { name: 'Remember login securely on this phone' }),
+  ).toBeChecked();
+  expect(screen.queryByText(/kept only while the app is running/)).toBeNull();
+});

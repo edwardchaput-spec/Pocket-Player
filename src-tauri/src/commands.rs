@@ -42,7 +42,7 @@ pub struct StartupView {
 #[serde(rename_all = "camelCase")]
 pub struct PlatformInfo {
     pub platform: &'static str,
-    /// False on Android, where passwords are kept in process memory only.
+    /// False only on targets without a platform credential store.
     pub persistent_credentials: bool,
 }
 

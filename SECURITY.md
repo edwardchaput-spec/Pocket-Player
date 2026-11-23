@@ -28,7 +28,7 @@ The intended controls include:
 
 - Rust-owned Navidrome networking and credential access;
 - Windows Credential Manager for remembered Windows passwords;
-- session-only Android credentials until a reviewed Keystore strategy exists;
+- Android Keystore-backed remembered passwords, reachable only from Rust (ADR-012);
 - fresh token-and-salt authentication without clear-text password query parameters;
 - a loopback-only, process-token media proxy with narrow routes;
 - same-host redirect validation and bounded network timeouts;

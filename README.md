@@ -8,7 +8,7 @@
 
 Pocket Player is a security-conscious, native-feeling client for people who self-host music with [Navidrome](https://www.navidrome.org/). It turns a browser-bound listening workflow into a dedicated Windows experience with dependable playback, fast library navigation, explainable discovery, local listening insights, and native desktop controls. Android support is in technical preview.
 
-> **Project status:** Working `0.1.0` source implementation. The core Windows experience is implemented and covered by automated checks; real-library release validation remains manual. Android has an adaptive interface and session-only credential strategy but is not yet release-ready. Signed public distribution and automatic updates are not available.
+> **Project status:** Working `0.1.0` source implementation. The core Windows experience is implemented and covered by automated checks; real-library release validation remains manual. Android has an adaptive interface and Keystore-backed remembered logins but is not yet release-ready. Signed public distribution and automatic updates are not available.
 
 For the short product narrative, prioritisation rationale, and validation plan, read the [product case study](docs/PRODUCT_CASE_STUDY.md).
 
@@ -86,7 +86,7 @@ The complete requirements, non-goals, and acceptance criteria live in the [produ
 | Windows experience              | Mini player, tray, media session actions, notifications, close-to-tray, single instance                             | Implemented in source; manual release checks remain                               |
 | Discovery and insight           | Explainable mix engine, configurable Home, local playback events and statistics                                     | Implemented in source; outcome validation pending                                 |
 | Lyrics and visualisation        | Plain/synchronised lyrics and 22 trusted adaptive visualisers                                                       | Implemented in source                                                             |
-| Android                         | Shared adaptive shell, safe-area handling, touch targets, and session-only credentials                              | Technical preview; device and packaging validation pending                        |
+| Android                         | Shared adaptive shell, safe-area handling, touch targets, and Keystore-backed credentials                           | Technical preview; device and packaging validation pending                        |
 | Public distribution             | Windows bundle configuration and local build process                                                                | Blocked on signing identity, protected keys, updater endpoint, and release policy |
 
 This status describes repository evidence, not customer adoption or production readiness. The project sends no telemetry by default, has no published usage metrics, and does not claim external market validation.
@@ -146,7 +146,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for trust boundaries, playback ownership,
 ## Security and privacy by design
 
 - Navidrome credentials and networking remain on the Rust side.
-- Remembered Windows passwords live in Windows Credential Manager; Android credentials are session-only until a reviewed Keystore implementation exists.
+- Remembered Windows passwords live in Windows Credential Manager; Android passwords are encrypted with a non-exportable Android Keystore key.
 - Authentication uses a fresh random salt for each supported Subsonic request; the clear-text password is never placed in a query parameter.
 - The media proxy binds to loopback, accepts only narrow media routes, and uses a random per-process token.
 - TLS validation and Tauri's Content Security Policy remain enabled.

@@ -7,6 +7,7 @@ import {
   calculateRenderSize,
   shouldRenderVisualizer,
 } from './performanceGovernor';
+import { ClaudeMind } from './claudeMindRenderer';
 import { drawSol56 } from './sol56Renderer';
 import { createWebGLScene, isWebGLMode } from './webglRenderer';
 import { VisualizerMode } from './visualizerPresets';
@@ -38,6 +39,7 @@ interface SceneState {
   random: () => number;
   lastBurst: number;
   seed: number;
+  claudeMind?: ClaudeMind | undefined;
 }
 
 export interface VisualizerDiagnostics {
@@ -260,7 +262,9 @@ function drawCanvasScene(
   context.setTransform(1, 0, 0, 1, 0, 0);
   context.globalCompositeOperation = 'source-over';
   context.globalAlpha = 1;
-  if (['sparks', 'dust', 'fountain', 'orbit', 'rain', 'ribbons'].includes(mode)) {
+  if (mode === 'claudeMind') {
+    // Claude mind paints its own background and trails.
+  } else if (['sparks', 'dust', 'fountain', 'orbit', 'rain', 'ribbons'].includes(mode)) {
     context.fillStyle = 'rgba(5, 6, 14, 0.18)';
     context.fillRect(0, 0, width, height);
   } else {
@@ -327,6 +331,20 @@ function drawCanvasScene(
         quality,
         reducedMotion,
         state.seed / 0xffffffff,
+      );
+      break;
+    case 'claudeMind':
+      state.claudeMind ??= new ClaudeMind(state.seed);
+      state.claudeMind.draw(
+        context,
+        frequency,
+        waveform,
+        features,
+        width,
+        height,
+        delta,
+        quality,
+        reducedMotion,
       );
       break;
     default:
